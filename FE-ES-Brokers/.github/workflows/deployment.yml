@@ -1,0 +1,90 @@
+name: Build and Deploy Brokers
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ACR_NAME: devindustryai
+  IMAGE_NAME: industry-es-brokers
+  VM_NAME: dev-industry-ai
+  RESOURCE_GROUP: dev_industry_ai_rg
+  
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Checkout source
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Azure login using OIDC
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Login to ACR
+      - name: Login to ACR
+        run: |
+          az acr login --name $ACR_NAME
+
+      # Build Docker image
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t $ACR_NAME.azurecr.io/$IMAGE_NAME:${{ github.sha }} .
+
+      # Push image to ACR
+      - name: Push Image to ACR
+        run: |
+          docker push \
+            $ACR_NAME.azurecr.io/$IMAGE_NAME:${{ github.sha }}
+
+      # Deploy to Azure VM
+      - name: Deploy to Azure VM
+        run: |
+          az vm run-command invoke \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$VM_NAME" \
+            --command-id RunShellScript \
+            --scripts '
+              set -e
+
+              echo "======================================"
+              echo "Deploying Brokers"
+              echo "======================================"
+
+              IMAGE_TAG="${{ github.sha }}"
+
+              echo "Image:"
+              echo "devindustryai.azurecr.io/industry-es-brokers:$IMAGE_TAG"
+
+              cd /home/azureuser
+
+              echo "Logging into Azure using VM Managed Identity..."
+              az login --identity
+
+              echo "Logging into ACR..."
+              az acr login --name devindustryai
+
+              echo "Pulling new brokers image..."
+              BROKERS_IMAGE_TAG="$IMAGE_TAG" docker compose pull industryai-brokers
+
+              echo "Starting updated brokers container..."
+              BROKERS_IMAGE_TAG="$IMAGE_TAG" docker compose up -d industryai-brokers
+
+              echo "Deployment completed."
+
+              echo "Running containers:"
+              docker compose ps
+            '

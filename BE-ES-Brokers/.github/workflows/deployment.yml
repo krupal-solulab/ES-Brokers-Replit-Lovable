@@ -1,0 +1,120 @@
+name: Build and Push Docker Image to ACR
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ACR_NAME: devindustryai
+  IMAGE_NAME: industry-ai-be
+  VM_NAME: dev-industry-ai
+  RESOURCE_GROUP: dev_industry_ai_rg
+
+
+jobs:
+  build-and-push:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    # Checkout source
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Debug GitHub OIDC Context
+      run: |
+        echo "Repository:"
+        echo "${{ github.repository }}"
+    
+        echo "Repository Owner:"
+        echo "${{ github.repository_owner }}"
+    
+        echo "Organization:"
+        echo "${{ github.organization }}"
+    
+        echo "Repository ID:"
+        echo "${{ github.repository_id }}"
+    
+        echo "Organization ID:"
+        echo "${{ github.repository_owner_id }}"
+    
+        echo "Branch:"
+        echo "${{ github.ref }}"
+    
+        echo "Workflow:"
+        echo "${{ github.workflow }}"
+    
+        echo "Workflow Ref:"
+        echo "${{ github.workflow_ref }}"
+    
+        echo "Actor:"
+        echo "${{ github.actor }}"
+    
+        echo "Event:"
+        echo "${{ github.event_name }}"
+
+    # Azure login using OIDC
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+
+    # Login to Azure Container Registry
+    - name: Login to ACR
+      run: |
+        az acr login --name $ACR_NAME
+
+
+    # Build Docker image
+    - name: Build Docker Image
+      run: |
+        docker build \
+          -t $ACR_NAME.azurecr.io/$IMAGE_NAME:${{ github.sha }} .
+
+    # Wait 45 seconds
+    - name: Wait 45 Seconds
+      run: sleep 45
+
+    # Push image to ACR
+    - name: Push Image to ACR
+      run: |
+        docker push \
+          $ACR_NAME.azurecr.io/$IMAGE_NAME:${{ github.sha }}
+           
+    # Deploy to Azure VM
+    - name: Deploy to Azure VM
+      run: |
+        az vm run-command invoke \
+          --resource-group "$RESOURCE_GROUP" \
+          --name "$VM_NAME" \
+          --command-id RunShellScript \
+          --scripts '
+            set -e
+            echo "======================================"
+            echo "Deploying AI-BE"
+            echo "======================================"
+            IMAGE_TAG="${{ github.sha }}"
+            echo "Image:"
+            echo "devindustryai.azurecr.io/industry-ai-be:$IMAGE_TAG"
+            cd /home/azureuser
+            echo "Logging into Azure using VM Managed Identity..."
+            az login --identity
+            echo "Logging into ACR..."
+            az acr login --name devindustryai
+            echo "Pulling new ai-be image..."
+            AI_BE_IMAGE_TAG="$IMAGE_TAG" docker compose pull industry-ai-be
+            echo "Starting updated be container..."
+            AI_BE_IMAGE_TAG="$IMAGE_TAG" docker compose up -d industry-ai-be
+            echo "Deployment completed."
+            echo "Running containers:"
+            docker compose ps
+          '          
