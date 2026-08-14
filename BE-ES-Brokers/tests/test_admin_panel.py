@@ -1,6 +1,6 @@
 """Admin Panel (AP-01..AP-06) — role gate, tenant/user management, live settings
 overrides (no restart), and the cross-workflow audit wrapper. Uses the shared
-``mem_session``/``mga_ctx`` fixtures from ``conftest.py``.
+``mem_session``/``demo_ctx`` fixtures from ``conftest.py``.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ def _clear_override_cache():
 
 
 def _ctx(tenant_id: str, role: Role) -> Ctx:
-    return Ctx(tenant_id=tenant_id, vertical=Vertical.MGA, user_id=f"u-{role.value}", role=role)
+    return Ctx(tenant_id=tenant_id, vertical=Vertical.ES, user_id=f"u-{role.value}", role=role)
 
 
 # ── AP-01: role guard ─────────────────────────────────────
@@ -57,16 +57,16 @@ def _ctx(tenant_id: str, role: Role) -> Ctx:
 async def test_require_role_admin_blocks_junior_and_senior(mem_session: AsyncSession) -> None:
     guard = require_role(Role.ADMIN)
     with pytest.raises(HTTPException) as exc:
-        await guard(_ctx("demo-mga", Role.JUNIOR))
+        await guard(_ctx("demo-es", Role.JUNIOR))
     assert exc.value.status_code == 403
     with pytest.raises(HTTPException) as exc:
-        await guard(_ctx("demo-mga", Role.SENIOR))
+        await guard(_ctx("demo-es", Role.SENIOR))
     assert exc.value.status_code == 403
 
 
 async def test_require_role_admin_allows_admin(mem_session: AsyncSession) -> None:
     guard = require_role(Role.ADMIN)
-    ctx = await guard(_ctx("demo-mga", Role.ADMIN))
+    ctx = await guard(_ctx("demo-es", Role.ADMIN))
     assert ctx.role is Role.ADMIN
 
 
@@ -74,9 +74,9 @@ async def test_require_role_admin_allows_admin(mem_session: AsyncSession) -> Non
 
 
 async def test_get_tenant_returns_real_row(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     out = await get_tenant(mem_session, ctx)
-    assert out.id == "demo-mga"
+    assert out.id == "demo-es"
     assert out.junior_premium_cap is None
 
 
@@ -85,10 +85,10 @@ async def test_tenant_cap_override_blocks_junior_on_next_review_action(
 ) -> None:
     """AP-02's acceptance line: setting a tenant-level cap changes real
     review-queue authority on the very next action, no restart."""
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     await update_tenant(mem_session, ctx, name=None, junior_premium_cap=75_000)
 
-    junior_ctx = _ctx("demo-mga", Role.JUNIOR)
+    junior_ctx = _ctx("demo-es", Role.JUNIOR)
     from core.common.dtos import Decision, OutputPackage
     from core.common.enums import DecisionOutcome, ReviewAction
 
@@ -103,7 +103,7 @@ async def test_tenant_cap_override_blocks_junior_on_next_review_action(
 
 
 async def test_tenant_cap_rejects_negative(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     with pytest.raises(InvalidSettingError):
         await update_tenant(mem_session, ctx, name=None, junior_premium_cap=-1)
 
@@ -114,7 +114,7 @@ async def test_tenant_cap_rejects_negative(mem_session: AsyncSession) -> None:
 async def test_create_user_is_immediately_loginable(mem_session: AsyncSession) -> None:
     """AP-03's acceptance line: POST /users must reuse login's exact lookup
     shape (User.email) so a new user can log in with no other change."""
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     created = await create_user(
         mem_session, ctx, email="New.Broker@Example.com", name="New Broker", role="junior"
     )
@@ -129,14 +129,14 @@ async def test_create_user_is_immediately_loginable(mem_session: AsyncSession) -
 
 
 async def test_create_user_duplicate_email_rejected(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     await create_user(mem_session, ctx, email="dup@example.com", name="A", role="junior")
     with pytest.raises(DuplicateEmailError):
         await create_user(mem_session, ctx, email="dup@example.com", name="B", role="senior")
 
 
 async def test_create_user_invalid_role_rejected(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     with pytest.raises(InvalidRoleError):
         await create_user(mem_session, ctx, email="x@example.com", name="X", role="owner")
 
@@ -144,44 +144,44 @@ async def test_create_user_invalid_role_rejected(mem_session: AsyncSession) -> N
 async def test_update_user_role_round_trips_through_get_ctx(mem_session: AsyncSession) -> None:
     """AP-03's acceptance line: a role change takes effect on the user's next
     login/header-stub resolution — no code change, no restart."""
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     created = await create_user(
         mem_session, ctx, email="promote@example.com", name="P", role="junior"
     )
     before = await get_ctx(
-        mem_session, x_tenant_id="demo-mga", x_user_id=created.id, x_role="junior"
+        mem_session, x_tenant_id="demo-es", x_user_id=created.id, x_role="junior"
     )
     assert before.role is Role.JUNIOR
 
     await update_user(mem_session, ctx, created.id, role="senior", name=None)
     after = await get_ctx(
-        mem_session, x_tenant_id="demo-mga", x_user_id=created.id, x_role="senior"
+        mem_session, x_tenant_id="demo-es", x_user_id=created.id, x_role="senior"
     )
     assert after.role is Role.SENIOR
 
 
 async def test_update_user_scoped_to_caller_tenant(mem_session: AsyncSession) -> None:
-    mem_session.add(Tenant(id="other-tenant", name="Other", vertical=Vertical.MGA))
+    mem_session.add(Tenant(id="other-tenant", name="Other", vertical=Vertical.ES))
     await mem_session.commit()
     other_ctx = _ctx("other-tenant", Role.ADMIN)
     other_user = await create_user(
         mem_session, other_ctx, email="isolated@example.com", name="I", role="junior"
     )
-    admin_ctx = _ctx("demo-mga", Role.ADMIN)
+    admin_ctx = _ctx("demo-es", Role.ADMIN)
     with pytest.raises(UserNotFoundError):
         await update_user(mem_session, admin_ctx, other_user.id, role="senior", name=None)
 
 
 async def test_list_users_scoped_to_tenant(mem_session: AsyncSession) -> None:
-    mem_session.add(Tenant(id="tenant-b", name="B", vertical=Vertical.MGA))
+    mem_session.add(Tenant(id="tenant-b", name="B", vertical=Vertical.ES))
     await mem_session.commit()
     await create_user(
-        mem_session, _ctx("demo-mga", Role.ADMIN), email="a1@example.com", name="A1", role="junior"
+        mem_session, _ctx("demo-es", Role.ADMIN), email="a1@example.com", name="A1", role="junior"
     )
     await create_user(
         mem_session, _ctx("tenant-b", Role.ADMIN), email="b1@example.com", name="B1", role="junior"
     )
-    a_users = await list_users(mem_session, _ctx("demo-mga", Role.ADMIN))
+    a_users = await list_users(mem_session, _ctx("demo-es", Role.ADMIN))
     assert {u.email for u in a_users} == {"a1@example.com"}
 
 
@@ -189,7 +189,7 @@ async def test_list_users_scoped_to_tenant(mem_session: AsyncSession) -> None:
 
 
 async def test_list_settings_defaults_to_env_source(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     settings = await list_settings(mem_session, ctx)
     assert {s.key for s in settings} == settings_override_module.SETTING_KEYS
     cap_row = next(s for s in settings if s.key == "junior_premium_cap")
@@ -200,20 +200,20 @@ async def test_list_settings_defaults_to_env_source(mem_session: AsyncSession) -
 async def test_save_setting_overrides_and_takes_effect_immediately(
     mem_session: AsyncSession,
 ) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     out = await save_setting(mem_session, ctx, "carrier_appetite_min_total_outcomes", "5")
     assert out.source == "admin_override"
     assert out.value == "5"
     # no restart, no re-read from DB needed — the in-process cache is already warm
     effective = get_effective_setting(
-        "demo-mga", "carrier_appetite_min_total_outcomes",
+        "demo-es", "carrier_appetite_min_total_outcomes",
         get_settings().carrier_appetite_min_total_outcomes,
     )
     assert effective == 5
 
 
 async def test_clear_setting_reverts_to_env_default(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     await save_setting(mem_session, ctx, "connectors_mode", "live")
     cleared = await clear_setting(mem_session, ctx, "connectors_mode")
     assert cleared.source == "env_default"
@@ -221,27 +221,27 @@ async def test_clear_setting_reverts_to_env_default(mem_session: AsyncSession) -
 
 
 async def test_save_setting_rejects_unknown_key(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     with pytest.raises(InvalidSettingError):
         await save_setting(mem_session, ctx, "not_a_real_setting", "x")
 
 
 async def test_save_setting_rejects_invalid_connectors_mode(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     with pytest.raises(InvalidSettingError):
         await save_setting(mem_session, ctx, "connectors_mode", "sandbox")
 
 
 async def test_save_setting_rejects_non_numeric_value(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     with pytest.raises(InvalidSettingError):
         await save_setting(mem_session, ctx, "quote_rank_price_weight", "not-a-number")
 
 
 async def test_settings_are_tenant_scoped(mem_session: AsyncSession) -> None:
-    mem_session.add(Tenant(id="tenant-c", name="C", vertical=Vertical.MGA))
+    mem_session.add(Tenant(id="tenant-c", name="C", vertical=Vertical.ES))
     await mem_session.commit()
-    await save_setting(mem_session, _ctx("demo-mga", Role.ADMIN), "connectors_mode", "live")
+    await save_setting(mem_session, _ctx("demo-es", Role.ADMIN), "connectors_mode", "live")
     other_settings = await list_settings(mem_session, _ctx("tenant-c", Role.ADMIN))
     other_mode = next(s for s in other_settings if s.key == "connectors_mode")
     assert other_mode.source == "env_default"
@@ -253,7 +253,7 @@ async def test_settings_are_tenant_scoped(mem_session: AsyncSession) -> None:
 async def test_query_audit_orders_recent_first_and_respects_limit(
     mem_session: AsyncSession,
 ) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     audit = DefaultAuditService()
     for i in range(3):
         await audit.record(
@@ -272,8 +272,8 @@ async def test_query_audit_orders_recent_first_and_respects_limit(
 
 
 async def test_overview_composes_tenant_connections_and_audit(mem_session: AsyncSession) -> None:
-    ctx = _ctx("demo-mga", Role.ADMIN)
+    ctx = _ctx("demo-es", Role.ADMIN)
     out = await get_overview(mem_session, ctx, audit_limit=5)
-    assert out.tenant.id == "demo-mga"
+    assert out.tenant.id == "demo-es"
     assert out.connections == []  # nothing connected in this throwaway DB
     assert out.recent_audit == []

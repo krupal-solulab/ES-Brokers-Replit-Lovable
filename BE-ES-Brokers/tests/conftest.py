@@ -21,7 +21,7 @@ _RULESET_PATH = Path(__file__).parent / "fixtures" / "ruleset_workflow1.json"
 
 @pytest.fixture
 async def mem_session() -> AsyncGenerator[AsyncSession, None]:
-    """Isolated in-memory SQLite session with all tables + a demo MGA tenant."""
+    """Isolated in-memory SQLite session with all tables + a demo core-test tenant."""
     from core.models import Tenant
 
     engine = create_async_engine("sqlite+aiosqlite://")
@@ -29,15 +29,15 @@ async def mem_session() -> AsyncGenerator[AsyncSession, None]:
         await conn.run_sync(SQLModel.metadata.create_all)
     maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with maker() as session:
-        session.add(Tenant(id="demo-mga", name="Demo MGA", vertical=Vertical.MGA))
+        session.add(Tenant(id="demo-es", name="Demo Core Test", vertical=Vertical.ES))
         await session.commit()
         yield session
     await engine.dispose()
 
 
 @pytest.fixture
-def mga_ctx() -> Ctx:
-    return Ctx(tenant_id="demo-mga", vertical=Vertical.MGA, user_id="u-jr", role=Role.JUNIOR)
+def demo_ctx() -> Ctx:
+    return Ctx(tenant_id="demo-es", vertical=Vertical.ES, user_id="u-jr", role=Role.JUNIOR)
 
 
 def load_ruleset() -> dict:

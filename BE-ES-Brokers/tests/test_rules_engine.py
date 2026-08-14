@@ -61,9 +61,9 @@ def test_disabled_rules_are_skipped() -> None:
     assert ids == {"on"}
 
 
-async def test_publish_and_rollback(mem_session, mga_ctx) -> None:
+async def test_publish_and_rollback(mem_session, demo_ctx) -> None:
     key = "verset"
-    rs = RuleSet(tenant_id=mga_ctx.tenant_id, vertical=mga_ctx.vertical, key=key)
+    rs = RuleSet(tenant_id=demo_ctx.tenant_id, vertical=demo_ctx.vertical, key=key)
     mem_session.add(rs)
     await mem_session.flush()
 
@@ -79,12 +79,12 @@ async def test_publish_and_rollback(mem_session, mga_ctx) -> None:
     engine = DefaultRulesEngine()
     model = _model(a__x="present")  # has x, not y
 
-    await engine.publish(mem_session, mga_ctx, key, 2)
-    r2 = await engine.evaluate(mem_session, mga_ctx, key, model)
+    await engine.publish(mem_session, demo_ctx, key, 2)
+    r2 = await engine.evaluate(mem_session, demo_ctx, key, model)
     assert {r.rule_id for r in r2} == {"need_y"} and not r2[0].passed  # v2 active, y missing
 
-    await engine.rollback(mem_session, mga_ctx, key, 1)
-    r1 = await engine.evaluate(mem_session, mga_ctx, key, model)
+    await engine.rollback(mem_session, demo_ctx, key, 1)
+    r1 = await engine.evaluate(mem_session, demo_ctx, key, model)
     assert {r.rule_id for r in r1} == {"need_x"} and r1[0].passed  # v1 active again, x present
 
 

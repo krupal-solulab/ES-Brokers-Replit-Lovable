@@ -4,7 +4,6 @@ vertical lookup work immediately in dev.
 Creates (idempotently, checked per-user so re-running after adding new users
 to `_USERS` below still seeds the new ones even though the tenant already
 exists):
-  - Tenant "demo-mga"  (vertical MGA) with a junior + a senior + an admin user
   - Tenant "demo-es"   (vertical ES)  with a junior + a senior + an admin
     user, plus three real-email login users for the email-based-role login
     feature (``manager.j@gmail.com`` -> junior, ``manager.s@gmail.com`` ->
@@ -47,18 +46,11 @@ from core.models import Tenant, User  # noqa: E402
 _DEV_ADMIN_PASSWORD = "Pa$$w0rd!"
 
 _TENANTS = [
-    ("demo-mga", "Demo MGA Ltd", Vertical.MGA),
     ("demo-es", "Demo E&S Brokerage", Vertical.ES),
 ]
 
 _USERS = [
     # (tenant_id, user_id, email, display_name, role, password)
-    ("demo-mga", "demo-mga-junior", "junior@demo-mga.example", "Demo Junior", Role.JUNIOR, None),
-    ("demo-mga", "demo-mga-senior", "senior@demo-mga.example", "Demo Senior", Role.SENIOR, None),
-    (
-        "demo-mga", "demo-mga-admin", "admin@demo-mga.example", "Demo Admin", Role.ADMIN,
-        _DEV_ADMIN_PASSWORD,
-    ),
     ("demo-es", "demo-es-junior", "junior@demo-es.example", "Demo Junior", Role.JUNIOR, None),
     ("demo-es", "demo-es-senior", "senior@demo-es.example", "Demo Senior", Role.SENIOR, None),
     (

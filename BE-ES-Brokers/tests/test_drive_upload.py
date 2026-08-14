@@ -1,11 +1,17 @@
 """Proves the Drive-upload fallback (docs/CONNECTORS_NANGO.md): connector-level
 put_file against a mocked Nango Drive proxy (httpx.MockTransport, no real
-network), the PDF generators, and each of the 3 originally-built workflows'
-export_all_to_drive — a manual, page-level bulk action that uploads one PDF
-covering every item in the workflow's list regardless of status. As of the
-bulk-export redesign, act("approve") no longer triggers any Drive upload at
-all; that assertion is covered explicitly here. Mirrors
-test_sheets_writeback.py's pattern.
+network), the (now vertical-agnostic, currently unused by any ES workflow)
+PDF generators, and the two real ES workflows that actually archive to Drive —
+Diligent Search & Compliance Documentation's manual, per-state
+``POST /{item_id}/save-to-drive`` (``verticals/es/workflows/diligent_search/
+router.py``, exercised directly here) and Binder & Policy Issuance's automatic
+``_maybe_archive_issued_policy`` (fires once an issued policy reconciles CLEAN
+— already covered end-to-end in tests/test_es_binder_issuance.py's
+``test_attach_live_policy_archives_to_drive_when_clean``, not duplicated here).
+Unlike the MGA-era design this backend used to have (a page-level bulk
+"export every item into one PDF" button per workflow), neither real ES Drive
+write-back is a bulk action — there is no bulk-upload equivalent here, so no
+test asserts one. Mirrors test_sheets_writeback.py's pattern.
 """
 
 from __future__ import annotations
@@ -16,14 +22,14 @@ from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
+from fastapi import HTTPException
 from pypdf import PdfReader
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 
 import core.models  # noqa: F401  (registers tables)
-from core.common.dtos import Ctx
+from core.common.dtos import Ctx, Draft
 from core.common.dtos import Decision as DecisionDTO
-from core.common.dtos import Draft
 from core.common.dtos import OutputPackage as OutputPackageDTO
 from core.common.enums import DecisionOutcome, Role, Vertical
 from core.config import get_settings
@@ -36,56 +42,38 @@ from core.ingestion.pdf_export import render_bulk_summary_pdf, render_summary_pd
 from core.ingestion.writeback import extract_folder_id, resolve_drive_folder_id, try_put_file
 from core.integrations.repository import upsert_connection
 from core.models import Tenant
-from verticals.mga.bind_issuance.schema import (
-    BindDetail,
-    DownstreamTriggersOut,
-    IssuanceReconciliationOut,
-    WriteBackOut,
+from core.review_queue import DefaultReviewQueueService
+from verticals.es.workflows.diligent_search.router import SaveToDriveRequest, save_to_drive
+from verticals.es.workflows.diligent_search.schema import (
+    ComplianceRecordPayload,
+    StateDeterminationOut,
 )
-from verticals.mga.bind_issuance.service import WORKFLOW as BIND_WORKFLOW
-from verticals.mga.bind_issuance.service import BindIssuanceService
-from verticals.mga.bordereau_reporting.schema import (
-    BordereauDetail,
-    CompletenessCheckOut,
-    DataCurrencyCheckOut,
-    FormatComplianceCheckOut,
-    ReconciliationCheckOut,
-)
-from verticals.mga.bordereau_reporting.service import WORKFLOW as BORDEREAU_WORKFLOW
-from verticals.mga.bordereau_reporting.service import BordereauService
-from verticals.mga.renewal_management.schema import (
-    RenewalBroker,
-    RenewalDetail,
-    RenewalRow,
-    RenewalTiming,
-)
-from verticals.mga.renewal_management.service import WORKFLOW as RENEWAL_WORKFLOW
-from verticals.mga.renewal_management.service import RenewalService
+from verticals.es.workflows.diligent_search.service import WORKFLOW_NAME as DILIGENT_SEARCH_WORKFLOW
 
 
 @pytest.fixture
-async def mga_session() -> AsyncGenerator[AsyncSession, None]:
+async def es_session() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with maker() as session:
-        session.add(Tenant(id="demo-mga", name="Demo MGA", vertical=Vertical.MGA))
+        session.add(Tenant(id="demo-es", name="Demo E&S", vertical=Vertical.ES))
         await session.commit()
         yield session
     await engine.dispose()
 
 
 @pytest.fixture
-def mga_ctx() -> Ctx:
-    return Ctx(tenant_id="demo-mga", vertical=Vertical.MGA, user_id="u-sr", role=Role.SENIOR)
+def es_ctx() -> Ctx:
+    return Ctx(tenant_id="demo-es", vertical=Vertical.ES, user_id="u-sr", role=Role.SENIOR)
 
 
 @pytest.fixture(autouse=True)
 def _force_mock_connectors_mode(monkeypatch):
     """The real .env sets CONNECTORS_MODE=live for this deployment — force "mock"
-    for every test in this file so export_pdf's upload call never attempts a real
-    Nango request via build_connector_service."""
+    for every test in this file so a workflow route's upload call never attempts
+    a real Nango request via build_connector_service."""
     monkeypatch.setenv("CONNECTORS_MODE", "mock")
     get_settings.cache_clear()
     yield
@@ -95,7 +83,10 @@ def _force_mock_connectors_mode(monkeypatch):
 def _drive_handler(request: httpx.Request) -> httpx.Response:
     """Exact-path-matched, per the lesson from Sheets: a loose match is exactly
     what let a wrong path ship to production undetected. Uploads use a DIFFERENT
-    host path than metadata-only calls (upload/drive/v3/files, not drive/v3/files)."""
+    host path than metadata-only calls (upload/drive/v3/files, not drive/v3/files).
+    Shared by both ``put_file`` (connector-level tests below) and ``upload_file``
+    (the workflow-level ``save_to_drive`` route below) — both hit this exact
+    same pair of real Drive API paths."""
     path = request.url.path
     if path == "/proxy/drive/v3/files" and request.method == "POST":
         body = json.loads(request.content)
@@ -118,12 +109,12 @@ def mocked_drive_transport(monkeypatch):
     monkeypatch.setattr(httpx, "AsyncClient", factory)
 
 
-async def _connected_drive_service(mga_ctx, mga_session) -> LiveNangoConnectorService:
+async def _connected_drive_service(es_ctx, es_session) -> LiveNangoConnectorService:
     await upsert_connection(
-        mga_session, mga_ctx.tenant_id, "google-drive",
+        es_session, es_ctx.tenant_id, "google-drive",
         nango_connection_id="conn-drive-1", status="connected",
     )
-    return LiveNangoConnectorService(get_settings(), mga_session)
+    return LiveNangoConnectorService(get_settings(), es_session)
 
 
 # ── extract_folder_id: a pasted URL must never reach the Drive proxy verbatim ──
@@ -143,7 +134,9 @@ def test_extract_folder_id_from_shared_drive_url() -> None:
     assert extract_folder_id(url) == "1AbCdEfGhIjKlMnOpQrS"
 
 
-# ── render_summary_pdf: proves a real, readable PDF ──
+# ── render_summary_pdf / render_bulk_summary_pdf: pure, vertical-agnostic core
+#    helpers — proven here regardless of whether any ES workflow calls them
+#    today (neither does; both remain available core plumbing) ──
 
 
 def test_render_summary_pdf_produces_real_pdf_with_expected_text() -> None:
@@ -157,9 +150,6 @@ def test_render_summary_pdf_produces_real_pdf_with_expected_text() -> None:
     assert "Bind Order Summary" in text
     assert "BND-1" in text
     assert "READY" in text
-
-
-# ── render_bulk_summary_pdf: one page per item, used by the new bulk action ──
 
 
 def test_render_bulk_summary_pdf_one_page_per_item() -> None:
@@ -190,27 +180,27 @@ def test_render_bulk_summary_pdf_empty_list_is_still_valid() -> None:
 # ── connector-level: LiveNangoConnectorService ──
 
 
-async def test_put_file_not_connected_raises(mga_ctx, mga_session) -> None:
-    service = LiveNangoConnectorService(get_settings(), mga_session)
+async def test_put_file_not_connected_raises(es_ctx, es_session) -> None:
+    service = LiveNangoConnectorService(get_settings(), es_session)
     with pytest.raises(ConnectorNotConnectedError):
-        await service.put_file(mga_ctx, "", "test.pdf", b"data", "application/pdf")
+        await service.put_file(es_ctx, "", "test.pdf", b"data", "application/pdf")
 
 
 async def test_put_file_creates_metadata_then_uploads_content(
-    mga_ctx, mga_session, mocked_drive_transport
+    es_ctx, es_session, mocked_drive_transport
 ) -> None:
-    service = await _connected_drive_service(mga_ctx, mga_session)
+    service = await _connected_drive_service(es_ctx, es_session)
     file_id = await service.put_file(
-        mga_ctx, "folder-1", "bind-BND-1.pdf", b"%PDF-fake-content", "application/pdf"
+        es_ctx, "folder-1", "bind-BND-1.pdf", b"%PDF-fake-content", "application/pdf"
     )
     assert file_id == "drive-file-1"
 
 
 async def test_put_file_omits_parents_when_no_folder_id(
-    mga_ctx, mga_session, mocked_drive_transport
+    es_ctx, es_session, mocked_drive_transport
 ) -> None:
-    service = await _connected_drive_service(mga_ctx, mga_session)
-    file_id = await service.put_file(mga_ctx, "", "bind-BND-1.pdf", b"data", "application/pdf")
+    service = await _connected_drive_service(es_ctx, es_session)
+    file_id = await service.put_file(es_ctx, "", "bind-BND-1.pdf", b"data", "application/pdf")
     assert file_id == "drive-file-1"
 
 
@@ -218,7 +208,7 @@ async def test_put_file_omits_parents_when_no_folder_id(
 
 
 async def test_mock_put_file_records_in_memory() -> None:
-    ctx = Ctx(tenant_id="demo-mga", vertical=Vertical.MGA, user_id="u", role=Role.SENIOR)
+    ctx = Ctx(tenant_id="demo-es", vertical=Vertical.ES, user_id="u", role=Role.SENIOR)
     service = MockConnectorService()
     file_id = await service.put_file(ctx, "folder-1", "test.pdf", b"data", "application/pdf")
     assert file_id
@@ -228,185 +218,161 @@ async def test_mock_put_file_records_in_memory() -> None:
 # ── resolve_drive_folder_id: empty is a valid "root Drive" value, not a skip ──
 
 
-async def test_resolve_drive_folder_id_empty_when_not_connected(mga_ctx, mga_session) -> None:
-    folder_id = await resolve_drive_folder_id(mga_session, mga_ctx.tenant_id, get_settings())
+async def test_resolve_drive_folder_id_empty_when_not_connected(es_ctx, es_session) -> None:
+    folder_id = await resolve_drive_folder_id(es_session, es_ctx.tenant_id, get_settings())
     assert folder_id == ""
 
 
-async def test_resolve_drive_folder_id_reads_tenants_own_connection(mga_ctx, mga_session) -> None:
+async def test_resolve_drive_folder_id_reads_tenants_own_connection(es_ctx, es_session) -> None:
     await upsert_connection(
-        mga_session, mga_ctx.tenant_id, "google-drive",
+        es_session, es_ctx.tenant_id, "google-drive",
         nango_connection_id="conn-drive-2", status="connected", folder_id="real-folder-abc",
     )
-    folder_id = await resolve_drive_folder_id(mga_session, mga_ctx.tenant_id, get_settings())
+    folder_id = await resolve_drive_folder_id(es_session, es_ctx.tenant_id, get_settings())
     assert folder_id == "real-folder-abc"
 
 
 # ── try_put_file helper: never raises, reports status ──
 
 
-async def test_try_put_file_skips_when_not_connected(mga_ctx, mga_session) -> None:
-    connector = LiveNangoConnectorService(get_settings(), mga_session)
-    status = await try_put_file(connector, mga_ctx, "", "test.pdf", b"data", "application/pdf")
+async def test_try_put_file_skips_when_not_connected(es_ctx, es_session) -> None:
+    connector = LiveNangoConnectorService(get_settings(), es_session)
+    status = await try_put_file(connector, es_ctx, "", "test.pdf", b"data", "application/pdf")
     assert status == "skipped-not-connected"
 
 
-async def test_try_put_file_ok_when_connected(mga_ctx, mga_session, mocked_drive_transport) -> None:
-    connector = await _connected_drive_service(mga_ctx, mga_session)
-    status = await try_put_file(connector, mga_ctx, "folder-1", "test.pdf", b"data", "application/pdf")
+async def test_try_put_file_ok_when_connected(es_ctx, es_session, mocked_drive_transport) -> None:
+    connector = await _connected_drive_service(es_ctx, es_session)
+    status = await try_put_file(connector, es_ctx, "folder-1", "test.pdf", b"data", "application/pdf")
     assert status == "ok"
 
 
-async def test_try_put_file_ok_with_no_folder_id(mga_ctx, mga_session, mocked_drive_transport) -> None:
+async def test_try_put_file_ok_with_no_folder_id(es_ctx, es_session, mocked_drive_transport) -> None:
     """Empty folder id is NOT a skip condition for Drive, unlike Sheets' empty
     sheet_id — it just means upload to the tenant's Drive root."""
-    connector = await _connected_drive_service(mga_ctx, mga_session)
-    status = await try_put_file(connector, mga_ctx, "", "test.pdf", b"data", "application/pdf")
+    connector = await _connected_drive_service(es_ctx, es_session)
+    status = await try_put_file(connector, es_ctx, "", "test.pdf", b"data", "application/pdf")
     assert status == "ok"
 
 
-# ── workflow export_all_to_drive: bulk-uploads one PDF covering the whole list,
-#    any status, manual/button-triggered — approve() never touches Drive ──
+# ── workflow-level: Diligent Search & Compliance Documentation's own
+#    POST /{item_id}/save-to-drive (verticals/es/workflows/diligent_search/
+#    router.py) — a manual, per-state archive action. Broker-triggered, not
+#    automatic (the PRD is explicit the workflow "doesn't transmit [the
+#    record] anywhere beyond the broker's own file" on its own), unlike the
+#    MGA-era bulk "export every item" button — no bulk equivalent exists here.
+#    Binder & Policy Issuance's own AUTOMATIC Drive archive
+#    (_maybe_archive_issued_policy, fired once an issued policy reconciles
+#    CLEAN) is already proven end-to-end in
+#    tests/test_es_binder_issuance.py::test_attach_live_policy_archives_to_drive_when_clean
+#    — not duplicated here. ──
 
 
-async def test_bind_issuance_act_no_longer_touches_drive(mga_ctx, mga_session) -> None:
-    """Approve must succeed on its own terms with no Drive side effect at all —
-    upload is now exclusively a manual bulk action, never triggered by act()."""
-    service = BindIssuanceService()
-    detail = BindDetail(
-        bindId="BND-1", submissionId="sub-1", namedInsured="Acme LLC",
-        worksheetReference=None, stalenessCheck=None, preBindSubjectivities=[],
-        authorityReconfirmation=None, bindOrderStatus="READY",
-        pasWriteBack=WriteBackOut(logged=True, bordereauSchemaValidated=True),
-        issuanceReconciliation=IssuanceReconciliationOut(status="NOT_YET_ISSUED", discrepancyDetail=[]),
-        postBindObligations=[],
-        downstreamTriggersFired=DownstreamTriggersOut(bindConfirmation=False, policyDelivered=False),
-        rationale="ok", activity=[],
+async def _enqueue_compliance_record(
+    es_session, es_ctx, *, compliance_record_id: str, state: str,
+    document_generated: bool, generated_document_text: str | None,
+    overall_status: str = "COMPLETE",
+) -> str:
+    payload = ComplianceRecordPayload(
+        compliance_record_id=compliance_record_id,
+        submission_id=compliance_record_id,
+        named_insured="Acme LLC",
+        state_determinations=[
+            StateDeterminationOut(
+                state=state, requirement_status="REQUIRED",
+                document_generated=document_generated,
+                generated_document_text=generated_document_text,
+            ),
+        ],
+        overall_status=overall_status,
     )
     out_dto = OutputPackageDTO(
-        submission_id="sub-1",
+        submission_id=compliance_record_id,
         decision=DecisionDTO(outcome=DecisionOutcome.PROCEED, score=None, rationale="ok"),
         draft=Draft(text="ok", citations=[]), flags=[], missing_info=[],
-        payload={"detail": detail.model_dump(by_alias=True)},
+        payload=payload.model_dump(),
     )
-    await service.review_queue.enqueue(mga_session, mga_ctx, out_dto, BIND_WORKFLOW)
+    item = await DefaultReviewQueueService().enqueue(
+        es_session, es_ctx, out_dto, DILIGENT_SEARCH_WORKFLOW
+    )
+    return item.id
 
-    result = await service.act(mga_session, mga_ctx, "sub-1", "approve")
-    assert result["status"] == "approved"
-    assert not hasattr(service, "export_pdf")
+
+async def test_save_to_drive_404s_for_unknown_item(es_ctx, es_session) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        await save_to_drive("does-not-exist", SaveToDriveRequest(state="CA"), es_ctx, es_session)
+    assert exc_info.value.status_code == 404
 
 
-async def test_bind_issuance_export_all_to_drive_skips_when_not_connected(
-    mga_ctx, mga_session, monkeypatch,
-) -> None:
+async def test_save_to_drive_404s_for_unknown_state(es_ctx, es_session) -> None:
+    item_id = await _enqueue_compliance_record(
+        es_session, es_ctx, compliance_record_id="CS-1", state="CA",
+        document_generated=True, generated_document_text="Diligent search record for CA.",
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await save_to_drive(item_id, SaveToDriveRequest(state="TX"), es_ctx, es_session)
+    assert exc_info.value.status_code == 404
+
+
+async def test_save_to_drive_409s_when_no_document_generated_yet(es_ctx, es_session) -> None:
+    item_id = await _enqueue_compliance_record(
+        es_session, es_ctx, compliance_record_id="CS-2", state="FL",
+        document_generated=False, generated_document_text=None,
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await save_to_drive(item_id, SaveToDriveRequest(state="FL"), es_ctx, es_session)
+    assert exc_info.value.status_code == 409
+
+
+async def test_save_to_drive_ok_when_connected(es_ctx, es_session) -> None:
+    """CONNECTORS_MODE is forced to "mock" for this whole file (fixture above)
+    — a connected Drive integration is enough for the route's own
+    build_connector_service() call to resolve a (mock) connector and succeed."""
+    await upsert_connection(
+        es_session, es_ctx.tenant_id, "google-drive",
+        nango_connection_id="conn-drive-3", status="connected",
+    )
+    item_id = await _enqueue_compliance_record(
+        es_session, es_ctx, compliance_record_id="CS-3", state="OR",
+        document_generated=True, generated_document_text="Diligent search record for OR.",
+    )
+    out = await save_to_drive(item_id, SaveToDriveRequest(state="OR"), es_ctx, es_session)
+    assert out.status == "ok"
+
+
+async def test_save_to_drive_skips_when_not_connected(es_ctx, es_session, monkeypatch) -> None:
     """MockConnectorService always "succeeds" (no connection concept), so this
     forces CONNECTORS_MODE=live with no seeded Connection row — the real path a
     genuinely unconnected tenant hits — to prove the guard works end to end."""
     monkeypatch.setenv("CONNECTORS_MODE", "live")
     get_settings.cache_clear()
-    service = BindIssuanceService()
-    status = await service.export_all_to_drive(mga_session, mga_ctx)
-    assert status == "skipped-not-connected"
+    item_id = await _enqueue_compliance_record(
+        es_session, es_ctx, compliance_record_id="CS-4", state="GA",
+        document_generated=True, generated_document_text="Diligent search record for GA.",
+    )
+    out = await save_to_drive(item_id, SaveToDriveRequest(state="GA"), es_ctx, es_session)
+    assert out.status == "skipped-not-connected"
     get_settings.cache_clear()
 
 
-async def test_bind_issuance_export_all_to_drive_covers_every_item_any_status(
-    mga_ctx, mga_session,
+async def test_save_to_drive_ok_over_real_nango_proxy_path(
+    es_ctx, es_session, monkeypatch, mocked_drive_transport,
 ) -> None:
-    """Bulk upload must include pending/escalated/approved items alike — no
-    status filtering, unlike the old approve-only per-item upload."""
+    """End-to-end proof the route is wired to the REAL Drive API path, not just
+    the mock connector shortcut above: forces CONNECTORS_MODE=live so
+    build_connector_service() returns a real LiveNangoConnectorService, whose
+    ``upload_file`` call has to satisfy the same exact-path-matched mock
+    transport the connector-level ``put_file`` tests above use."""
+    monkeypatch.setenv("CONNECTORS_MODE", "live")
+    get_settings.cache_clear()
     await upsert_connection(
-        mga_session, mga_ctx.tenant_id, "google-drive",
-        nango_connection_id="conn-drive-3", status="connected",
-    )
-    service = BindIssuanceService()
-    for i, bind_id in enumerate(["BND-A", "BND-B"]):
-        detail = BindDetail(
-            bindId=bind_id, submissionId=f"sub-{i}", namedInsured="Acme LLC",
-            worksheetReference=None, stalenessCheck=None, preBindSubjectivities=[],
-            authorityReconfirmation=None, bindOrderStatus="READY",
-            pasWriteBack=WriteBackOut(logged=True, bordereauSchemaValidated=True),
-            issuanceReconciliation=IssuanceReconciliationOut(
-                status="NOT_YET_ISSUED", discrepancyDetail=[]),
-            postBindObligations=[],
-            downstreamTriggersFired=DownstreamTriggersOut(
-                bindConfirmation=False, policyDelivered=False),
-            rationale="ok", activity=[],
-        )
-        out_dto = OutputPackageDTO(
-            submission_id=f"sub-{i}",
-            decision=DecisionDTO(outcome=DecisionOutcome.PROCEED, score=None, rationale="ok"),
-            draft=Draft(text="ok", citations=[]), flags=[], missing_info=[],
-            payload={"detail": detail.model_dump(by_alias=True)},
-        )
-        await service.review_queue.enqueue(mga_session, mga_ctx, out_dto, BIND_WORKFLOW)
-    await service.act(mga_session, mga_ctx, "sub-1", "approve")  # sub-0 stays pending
-
-    status = await service.export_all_to_drive(mga_session, mga_ctx)
-    assert status == "ok"
-
-
-async def test_bordereau_export_all_to_drive_ok_when_connected(mga_ctx, mga_session) -> None:
-    await upsert_connection(
-        mga_session, mga_ctx.tenant_id, "google-drive",
+        es_session, es_ctx.tenant_id, "google-drive",
         nango_connection_id="conn-drive-4", status="connected",
     )
-    service = BordereauService()
-    detail = BordereauDetail(
-        bordereauId="BR-1", bordereauType="loss", carrierName="Acme Re",
-        reportingPeriod="2027-Q1", dueDate="2027-04-15",
-        completenessCheck=CompletenessCheckOut(status="complete", missingTransactions=[]),
-        formatComplianceCheck=FormatComplianceCheckOut(status="pass", issues=[]),
-        reconciliationCheck=ReconciliationCheckOut(status="pass", discrepancyDetail=[]),
-        dataCurrencyCheck=DataCurrencyCheckOut(status="current", staleItems=[]),
-        timelinessCheck=None, status="complete", rationale="ok", activity=[],
+    item_id = await _enqueue_compliance_record(
+        es_session, es_ctx, compliance_record_id="CS-5", state="NV",
+        document_generated=True, generated_document_text="Diligent search record for NV.",
     )
-    out_dto = OutputPackageDTO(
-        submission_id="sub-3",
-        decision=DecisionDTO(outcome=DecisionOutcome.PROCEED, score=None, rationale="ok"),
-        draft=Draft(text="ok", citations=[]), flags=[], missing_info=[],
-        payload={"detail": detail.model_dump(by_alias=True)},
-    )
-    await service.review_queue.enqueue(mga_session, mga_ctx, out_dto, BORDEREAU_WORKFLOW)
-
-    status = await service.export_all_to_drive(mga_session, mga_ctx)
-    assert status == "ok"
-
-
-async def test_renewal_export_all_to_drive_ok_when_connected(mga_ctx, mga_session) -> None:
-    await upsert_connection(
-        mga_session, mga_ctx.tenant_id, "google-drive",
-        nango_connection_id="conn-drive-5", status="connected",
-    )
-    service = RenewalService()
-    detail = RenewalDetail(
-        id="sub-4", subject="Renewal - Acme - Eff 2027-01-01", recommendation="RENEW_AS_IS",
-        confidence=1.0, processing="ready", priorSource="manual_queue", rulesVersion="v1",
-        rulesVersionAtBinding="v1", hardRulePassed=True, appetite=[], appetiteDrift=None,
-        comparison=[], changeFlags=[], lossChanges=[],
-        timing=RenewalTiming(daysToExpiration=30, lapseRisk=False, noSubmission=False),
-        changes=[], narrative="ok", citations=[],
-        broker=RenewalBroker(name="", agency="", tenure="", note="", email=""),
-        activity=[], needsInfo=False, missingInfo=[], retention="neutral",
-        priorPremium="$10,000", indicated="—", premiumChange="—", lossRatio="—",
-    )
-    row = RenewalRow(
-        id="sub-4", subject=detail.subject, insured="Acme LLC",
-        recommendation=detail.recommendation, score=None, retention=detail.retention,
-        daysToExpiration=30, lapseRisk=False, status="pending", received="2027-01-01",
-        priorPremium=detail.priorPremium, indicated=detail.indicated,
-    )
-    out_dto = OutputPackageDTO(
-        submission_id="sub-4",
-        decision=DecisionDTO(outcome=DecisionOutcome.PROCEED, score=None, rationale="ok"),
-        draft=Draft(text="ok", citations=[]), flags=[], missing_info=[],
-        payload={
-            "detail": detail.model_dump(by_alias=True),
-            "row": row.model_dump(),
-            "activity": [],
-        },
-    )
-    await service.review_queue.enqueue(mga_session, mga_ctx, out_dto, RENEWAL_WORKFLOW)
-
-    status = await service.export_all_to_drive(mga_session, mga_ctx)
-    assert status == "ok"
+    out = await save_to_drive(item_id, SaveToDriveRequest(state="NV"), es_ctx, es_session)
+    assert out.status == "ok"
+    get_settings.cache_clear()

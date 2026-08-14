@@ -1,7 +1,7 @@
 """Async jobs — the ingestion→extraction task + queryable error queue.
 
 The task uses the app's configured DB (core.db.async_session_factory). These tests need
-the base tables (run `alembic upgrade head`) and the `demo-mga` tenant (run the seed) —
+the base tables (run `alembic upgrade head`) and the `demo-es` tenant (run the seed) —
 both part of the standard setup. The error-queue assertions do NOT require Redis.
 
 The Arq burst test runs the real worker against an in-memory fakeredis (no Redis server);
@@ -31,11 +31,11 @@ async def _tenant_exists(tenant_id: str) -> bool:
 
 
 async def test_ingest_and_extract_success_records_job_run() -> None:
-    if not await _tenant_exists("demo-mga"):
-        pytest.skip("demo-mga tenant not seeded; run `python src/core/seed.py`")
+    if not await _tenant_exists("demo-es"):
+        pytest.skip("demo-es tenant not seeded; run `python src/core/seed.py`")
 
     result = await ingest_and_extract(
-        {}, tenant_id="demo-mga", vertical="MGA", message_id="submission_02", workflow_n=1
+        {}, tenant_id="demo-es", vertical="ES", message_id="submission_02", workflow_n=1
     )
     assert result["fields"] > 0
     assert result["documents"] >= 4
@@ -53,25 +53,25 @@ async def test_ingest_and_extract_success_records_job_run() -> None:
 
 
 async def test_failed_job_goes_to_queryable_error_queue() -> None:
-    if not await _tenant_exists("demo-mga"):
-        pytest.skip("demo-mga tenant not seeded; run `python src/core/seed.py`")
+    if not await _tenant_exists("demo-es"):
+        pytest.skip("demo-es tenant not seeded; run `python src/core/seed.py`")
 
     bad_id = f"missing-{uuid.uuid4().hex[:8]}"
     with pytest.raises(KeyError):
         await ingest_and_extract(
-            {}, tenant_id="demo-mga", vertical="MGA", message_id=bad_id, workflow_n=1
+            {}, tenant_id="demo-es", vertical="ES", message_id=bad_id, workflow_n=1
         )
 
     # Error is visible/queryable without Redis.
     async with async_session_factory() as s:
-        errors = await JobRunService.errors(s, tenant_id="demo-mga")
+        errors = await JobRunService.errors(s, tenant_id="demo-es")
         assert any(e.submission_id == bad_id for e in errors)
 
 
 async def test_arq_worker_burst_mode() -> None:
     """Run the real Arq worker in burst mode against fakeredis (no Redis server)."""
-    if not await _tenant_exists("demo-mga"):
-        pytest.skip("demo-mga tenant not seeded; run `python src/core/seed.py`")
+    if not await _tenant_exists("demo-es"):
+        pytest.skip("demo-es tenant not seeded; run `python src/core/seed.py`")
     try:
         import fakeredis.aioredis  # noqa: F401
         from arq import ArqRedis
@@ -84,7 +84,7 @@ async def test_arq_worker_burst_mode() -> None:
     try:
         job = await redis.enqueue_job(
             "ingest_and_extract",
-            tenant_id="demo-mga", vertical="MGA", message_id="submission_03", workflow_n=1,
+            tenant_id="demo-es", vertical="ES", message_id="submission_03", workflow_n=1,
         )
         worker = Worker(
             functions=[ingest_and_extract],

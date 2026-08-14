@@ -21,7 +21,6 @@ from core.dashboard.router import router as dashboard_router
 from core.db import async_session_factory
 from core.integrations.router import router as integrations_router
 from verticals.es.router import router as es_router
-from verticals.mga.router import router as mga_router
 
 
 @asynccontextmanager
@@ -82,5 +81,4 @@ core_router.include_router(admin_router)
 core_router.include_router(app_config_router)
 
 app.include_router(core_router)
-app.include_router(mga_router)
 app.include_router(es_router)

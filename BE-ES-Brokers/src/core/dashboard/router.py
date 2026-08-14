@@ -11,7 +11,6 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.common.dtos import Ctx
-from core.dashboard.mga_service import build_mga_dashboard_overview
 from core.dashboard.service import build_dashboard_overview
 from core.db import get_session
 from core.tenancy.dependencies import get_ctx
@@ -112,36 +111,3 @@ class DashboardOverviewOut(BaseModel):
 async def get_dashboard_overview(ctx: CtxDep, session: SessionDep) -> DashboardOverviewOut:
     data = await build_dashboard_overview(session, ctx)
     return DashboardOverviewOut(**data)
-
-
-class MgaRecentActivityOut(BaseModel):
-    workflow: str
-    ref: str
-    status: str
-    created_at: str
-
-
-class MgaDailyPipelinePointOut(BaseModel):
-    date: str
-    submissions: int
-    bound: int
-
-
-class MgaDashboardOverviewOut(BaseModel):
-    generated_at: str
-    workflow_counts: dict[str, int]
-    submissions_today: int
-    quotes_today: int
-    binds_today: int
-    endorsements_pending: int
-    renewals_pending: int
-    bound_premium_mtd: float
-    hit_ratio_pct: float | None
-    recent_activity: list[MgaRecentActivityOut]
-    daily_pipeline: list[MgaDailyPipelinePointOut]
-
-
-@router.get("/overview/mga")
-async def get_mga_dashboard_overview(ctx: CtxDep, session: SessionDep) -> MgaDashboardOverviewOut:
-    data = await build_mga_dashboard_overview(session, ctx)
-    return MgaDashboardOverviewOut(**data)

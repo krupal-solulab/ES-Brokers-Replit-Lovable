@@ -16,7 +16,7 @@ pytestmark = pytest.mark.skipif(
     reason="TEST_DATA_ROOT not set; real Workflow_1 fixtures unavailable",
 )
 
-CTX = Ctx(tenant_id="demo-mga", vertical=Vertical.MGA, user_id="u", role=Role.JUNIOR)
+CTX = Ctx(tenant_id="demo-es", vertical=Vertical.ES, user_id="u", role=Role.JUNIOR)
 
 
 async def _fields(ref: str) -> dict:

@@ -10,7 +10,7 @@ from core.review_queue import AuthorityError, DefaultReviewQueueService
 
 
 def _ctx(role: Role) -> Ctx:
-    return Ctx(tenant_id="demo-mga", vertical=Vertical.MGA, user_id=f"u-{role.value}", role=role)
+    return Ctx(tenant_id="demo-es", vertical=Vertical.ES, user_id=f"u-{role.value}", role=role)
 
 
 async def _enqueue(session, ctx) -> str:
