@@ -1,0 +1,15 @@
+{
+  "trigger_type": "NO_RESPONSE_FOLLOWUP",
+  "source_workflow": "Retail Agent Communication (self-triggered)",
+  "submission_id": "SUB-3302",
+  "named_insured": "Delta Electric Services LLC",
+  "retail_agent_name": "Rachel Combs",
+  "retail_agency": "Harbor Retail Agency",
+  "agent_relationship_tenure": "2 years, moderate volume",
+  "original_request_sent_date": "2027-07-14",
+  "days_since_original_request": 9,
+  "original_request_type": "MISSING_INFO_REQUEST",
+  "carrier_name": "Palmetto Specialty Underwriters",
+  "carrier_acceptance_window_days": 45,
+  "days_remaining_in_window": 36
+}

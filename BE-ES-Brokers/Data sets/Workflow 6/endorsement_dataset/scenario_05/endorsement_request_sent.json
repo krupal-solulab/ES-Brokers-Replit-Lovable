@@ -1,0 +1,10 @@
+{
+  "bind_id": "BIND-6601",
+  "named_insured": "Continental Freight Carriers Inc.",
+  "carrier_id": "CAR-06",
+  "carrier_name": "Vantage Excess Partners",
+  "requested_change": {
+    "type": "additional_insured_endorsement",
+    "detail": "Add BOTH Midstate Distribution Co. AND Harborline Logistics as scheduled additional insureds, effective 09/20/2027"
+  }
+}

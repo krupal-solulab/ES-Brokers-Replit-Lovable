@@ -1,0 +1,18 @@
+EXPECTED OUTPUT — Q3 2027 Pipeline Funnel
+
+Submissions Received: 84
+  -> Matched to Carrier: 79 (94.0%)
+  -> Packages Assembled: 79 (100.0% of matched)
+  -> Quotes Received: 61 (77.2% of packaged - i.e. 18 packages resulted
+     in no quote at all: declination or no response)
+  -> Compared & Selected: 58 (95.1% of quoted)
+  -> Bound: 47 (81.0% of selected)
+
+Overall Submission-to-Bind Conversion: 55.9% (47 of 84)
+
+DATA COMPLETENESS: Marked COMPLETE for this period - all figures
+presented with full confidence, no estimation or gap-filling involved
+(per PR-06).
+
+This is a standard, fully-supported report - included as a control case
+to establish the clean baseline the other scenarios deviate from.

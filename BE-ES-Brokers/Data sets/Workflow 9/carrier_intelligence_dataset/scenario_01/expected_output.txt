@@ -1,0 +1,10 @@
+EXPECTED OUTPUT — Palmetto / Roofing (Low Volume)
+
+Signal aggregation (CI-01): 1 observed outcome, consistent with stated
+profile (severity ceiling exceeded, as expected).
+
+Suppression check (CI-05): SUPPRESSED - a single data point, even a
+fully consistent one, is not sufficient to generate any suggestion.
+NO OUTPUT GENERATED for this carrier/class combination. This is the
+correct, default behavior for the overwhelming majority of signals this
+workflow will observe - most should produce nothing.

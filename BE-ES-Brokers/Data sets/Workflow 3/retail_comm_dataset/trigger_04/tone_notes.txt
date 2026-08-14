@@ -1,0 +1,13 @@
+TONE NOTES - Trigger 04
+
+- Leads with the outcome ("bound") immediately, no preamble - this is
+  unambiguous good news and should read that way from the first line
+- Bulleted terms for quick scanning, mirroring the MGA Quote Summary
+  pattern (Trigger 03 in that dataset) - the agent likely needs to
+  relay this to their client quickly
+- "Clean placement, no issues" is an appropriate closing note here
+  specifically because it WAS clean - contrast with Trigger 06, where
+  a similar-sounding placement confirmation needs very different
+  framing because the account wasn't clean
+- Sets expectation on next step (policy documents) without the broker
+  needing to be asked

@@ -1,0 +1,37 @@
+EXPECTED COORDINATION OUTPUT — Oakwood Apartment Homes (POLICY DISCREPANCY)
+
+Issued policy reconciliation against bound terms (per BI-05):
+  Premium: $81,500 - MATCHES bound terms
+  Property Limit: $18,000,000 - MATCHES
+  GL Limits: MATCHES
+  All Perils Deductible: $10,000 - MATCHES
+  WIND/HAIL DEDUCTIBLE: Policy shows $100,000, BOUND TERMS confirmed
+    $50,000 - DISCREPANCY, and a MATERIAL one (2x higher retained risk
+    than what was bound and communicated to the retail agent/client)
+  Effective Date: MATCHES
+
+STATUS: MATERIAL DISCREPANCY FLAGGED - policy issuance error, not a
+minor formatting difference.
+
+SYSTEM BEHAVIOR: Per BI-05, this is exactly the kind of check that
+justifies this workflow's existence beyond simple status tracking - an
+issued policy that silently doesn't match what was bound is a genuine,
+known failure mode in this industry, and if undetected, the insured
+would be carrying $100,000 of wind/hail exposure while believing
+(based on what was bound and communicated) that they had $50,000.
+
+RECOMMENDED BROKER ACTION: Contact Coastal Mutual immediately to
+correct the policy - this should NOT be forwarded to the retail agent
+as a final policy document until resolved, even though everything else
+about the transaction was clean.
+
+DOWNSTREAM TRIGGER: does NOT fire a "policy documents delivered,
+transaction complete" notification to the retail agent - that trigger
+is reserved for confirmed-accurate policy issuance, consistent with the
+same principle established in Scenario 03 (a carrier-issued document is
+data to verify, not unquestionable ground truth).
+
+This scenario is the highest-value check in the entire Binder & Policy
+Issuance workflow - it's the one most directly protective of the
+insured and most likely to catch a real, costly error before it causes
+harm.

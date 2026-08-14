@@ -1,0 +1,18 @@
+{
+  "bind_id": "BIND-6605",
+  "named_insured": "Clearpath Bookkeeping Services LLC",
+  "incumbent_carrier_id": "CAR-05",
+  "incumbent_carrier_name": "Apex Excess Lines",
+  "expiring_terms": {"premium": 2400, "limits": "General Liability $1,000,000/$2,000,000", "effective_date": "2027-08-01"},
+  "expiring_term_loss_activity": "No new claims",
+  "exposure_change": {"revenue_prior": 365000, "revenue_current": 398000, "pct_change": 9.0},
+  "incumbent_renewal_offer": {
+    "received": true,
+    "received_date": "2028-06-25",
+    "days_before_expiration": 37,
+    "premium": 2550,
+    "limits": "General Liability $1,000,000/$2,000,000",
+    "pct_premium_change": 6.25
+  },
+  "remarketing_history": "This account has been remarketed 2 of the last 2 renewal cycles by broker preference, with no carrier change resulting either time - minimal savings found ($50-100) both times"
+}

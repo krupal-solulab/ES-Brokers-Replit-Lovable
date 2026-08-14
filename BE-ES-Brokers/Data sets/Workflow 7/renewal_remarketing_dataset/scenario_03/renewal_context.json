@@ -1,0 +1,23 @@
+{
+  "bind_id": "BIND-6602",
+  "named_insured": "Oakwood Apartment Homes LP",
+  "incumbent_carrier_id": "CAR-04",
+  "incumbent_carrier_name": "Coastal Mutual Specialty",
+  "expiring_terms": {"premium": 81500, "limits": "Property $18,000,000 blanket; GL $1,000,000/$2,000,000", "effective_date": "2027-08-15"},
+  "expiring_term_loss_activity": "No new claims during expiring term; the 2024 water damage claim ($32,000) is now 4+ years old with no recurrence",
+  "exposure_change": {
+    "revenue_prior": 3850000,
+    "revenue_current": 5100000,
+    "pct_change": 32.5,
+    "note": "Increase driven by the Willowbrook Commons location addition (endorsed mid-term, TIV +$12.5M) - this is KNOWN, already-underwritten growth, not new information to the incumbent"
+  },
+  "incumbent_renewal_offer": {
+    "received": true,
+    "received_date": "2028-06-10",
+    "days_before_expiration": 66,
+    "premium": 118000,
+    "limits": "Property $30,500,000 blanket; GL $1,000,000/$2,000,000",
+    "pct_premium_change": 44.8,
+    "note": "Premium increase roughly proportional to TIV increase from the endorsed location, consistent with a straightforward re-rate rather than a risk-based increase"
+  }
+}

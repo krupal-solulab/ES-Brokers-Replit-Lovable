@@ -1,0 +1,18 @@
+{
+  "carrier_id": "CAR-01",
+  "carrier_name": "Meridian Excess & Surplus",
+  "lines_written": ["General Liability", "Excess Casualty"],
+  "class_codes_accepted": ["contractors - electrical", "contractors - plumbing", "landscaping", "general mercantile"],
+  "class_codes_excluded": ["habitational", "roofing", "cannabis", "asbestos abatement"],
+  "states_licensed": ["SC", "NC", "GA", "TN", "VA"],
+  "premium_band": {"min": 10000, "max": 150000},
+  "submission_requirements": {
+    "min_loss_run_years": 5,
+    "required_documents": ["ACORD 125", "ACORD 126", "5-year loss run", "current financials"],
+    "acceptance_window_days": 60
+  },
+  "severity_ceiling": {"max_single_claim_incurred": 200000},
+  "appetite_confidence": "high",
+  "appetite_last_updated": "2027-05-01",
+  "historical_hit_rate_this_class": 0.62
+}

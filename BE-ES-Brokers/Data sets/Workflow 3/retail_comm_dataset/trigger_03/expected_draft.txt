@@ -1,0 +1,46 @@
+EXPECTED DRAFT — No Market Found Notice (DRAFT ONLY, PRE-COMPLIANCE-REVIEW)
+
+Subject: GreenLeaf Cultivation Facility - Market Search Update
+
+Hi Angela,
+
+Wanted to give you an update rather than let this sit: we reviewed
+GreenLeaf Cultivation against our full carrier panel and weren't able
+to find a market willing to write this class in the current environment.
+Cannabis cultivation remains a tightly restricted class across most of
+our markets right now.
+
+This isn't a reflection of the account itself - the loss history and
+financials both look clean. It's a market-access issue on our end for
+this specific class. We've documented the panel review for your file in
+case it's needed for diligent-search purposes.
+
+A couple of options if you want to keep pursuing this: we can check back
+periodically as carrier appetite in this space shifts, or if you have a
+specialty cannabis-focused wholesaler relationship elsewhere, that may
+be a faster path. Happy to talk through either.
+
+Thanks,
+[Broker name]
+Coverline Wholesale
+
+---
+TONE NOTES:
+- Structurally mirrors the MGA Non-Renewal Notice pattern (separates
+  "the market/rules issue" from "something wrong with the account") -
+  same underlying principle (RN-10/TN-08 from the MGA PRDs) applied to
+  a new-business-declination context instead of a renewal context
+- Does NOT name which specific carriers were approached or declined -
+  per the compliance flag in the trigger data, carrier-level appetite/
+  declination information may be commercially sensitive and shouldn't
+  be disclosed by default; this draft deliberately stays at the
+  aggregate "panel reviewed" level pending explicit compliance guidance
+- Offers a concrete next step (check back periodically, or refer
+  elsewhere) rather than ending on the bad news - this is a real
+  distribution relationship the wholesaler wants to keep, even on a
+  declined account
+- CRITICAL: like the MGA Non-Renewal Notice, this draft type must be
+  flagged for compliance review before send in the actual product,
+  and the compliance question about carrier-name disclosure must be
+  resolved with the design partner's legal function during discovery,
+  not assumed

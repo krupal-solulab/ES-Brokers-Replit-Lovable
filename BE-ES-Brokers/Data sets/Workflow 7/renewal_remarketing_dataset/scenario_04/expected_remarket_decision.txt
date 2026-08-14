@@ -1,0 +1,32 @@
+EXPECTED REMARKET DECISION — Delta Electric Services
+
+Exposure change detection (per RR-01): Revenue +2.7% - immaterial.
+
+Loss history change detection (per RR-02): No new claims - flat,
+favorable.
+
+Incumbent appetite recheck (per RR-03) / Silent non-response detection
+(per RR-07): NO RENEWAL OFFER RECEIVED with only 25 days remaining
+before expiration, despite two broker follow-ups. On an account with no
+adverse change of its own, incumbent silence this close to expiration
+is itself a signal worth treating seriously - it may indicate a
+book-wide appetite shift at Ironclad (e.g., exiting or repricing the
+electrical contractor class broadly) rather than anything specific to
+Delta Electric, but the system cannot distinguish those from the
+outside and should not assume the silence is benign.
+
+Remarket trigger decision (per RR-04): REMARKET TRIGGERED, URGENT. This
+is a DIFFERENT trigger reason than Scenarios 02/03 - not a pricing or
+exposure signal, but a genuine lapse-risk signal: an account with clean
+history is at real risk of finding itself without a renewal offer at
+all if this isn't proactively addressed. This should be treated with
+similar urgency to a timing-critical flag elsewhere in this vertical
+(e.g., Quote Comparison's expiring-quote alerts), not as a routine
+renewal review.
+
+RECOMMENDED ACTION: Immediately re-run Market Matching (per RR-05)
+against Delta Electric's current profile to identify backup market
+options, in parallel with continuing to press Ironclad's renewal desk
+for a substantive response - do not wait until closer to expiration to
+begin this, given 25 days is already a narrow window to complete a full
+remarket if Ironclad does turn out to be exiting this class.

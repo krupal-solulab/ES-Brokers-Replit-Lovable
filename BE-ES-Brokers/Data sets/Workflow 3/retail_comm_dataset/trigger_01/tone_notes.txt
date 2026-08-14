@@ -1,0 +1,16 @@
+TONE NOTES - Trigger 01
+
+- Leads with concrete action taken ("we've taken this to market with
+  two carriers") rather than a vague "working on it" - retail agents
+  want to know something is actually moving
+- Mentions the Meridian gap factually and briefly, without alarm -
+  it's already been disclosed to the carrier (per Package Assembly's
+  READY_WITH_GAP cover letter handling), so this is just keeping the
+  retail agent in the loop, not asking them to do anything yet
+- Sets an expectation on timing (10 business days) so the agent isn't
+  left wondering when to expect an update - mirrors the deadline-
+  anchoring principle from the MGA Broker Communication tone rules
+- Does not name which specific documents are still open for Meridian
+  in this acknowledgment - that's a distinct communication type
+  (Missing Info Request, Trigger 02) if/when it becomes something the
+  agent needs to act on

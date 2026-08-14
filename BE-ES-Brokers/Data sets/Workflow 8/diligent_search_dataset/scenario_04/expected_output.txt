@@ -1,0 +1,22 @@
+EXPECTED OUTPUT — Continental Freight Carriers (MULTI-STATE)
+
+This is a multi-state risk (8 states of operation) with a SINGLE
+diligent-search determination NOT being sufficient (per DS-01/DS-02) -
+each state's requirement must be checked independently, since Florida's
+export-list exemption does not extend to Tennessee or Georgia's
+requirements.
+
+STATUS: PARTIAL DETERMINATION - TN and GA confirmed requiring standard
+diligent search (3 admitted declinations each); FL appears export-list
+exempt but this needs confirmation given the account's specific size/
+class combination (export eligibility can depend on account size, not
+just class code alone in some states); NC, SC, VA, AL, MS not yet
+checked - FLAGGED AS INCOMPLETE, not silently assumed to match the
+already-checked states.
+
+RECOMMENDATION: This is a genuinely complex multi-state compliance
+determination that should NOT be reduced to a single simplified answer
+- system should present a state-by-state checklist and clearly mark
+which determinations are confirmed vs. still pending, rather than
+implying a single overall "compliant" or "non-compliant" status for
+the whole account.

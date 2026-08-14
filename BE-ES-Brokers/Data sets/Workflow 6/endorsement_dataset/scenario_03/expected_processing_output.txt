@@ -1,0 +1,31 @@
+EXPECTED PROCESSING OUTPUT — Delta Electric Services
+
+Classification (per EP-01): UNDERWRITING-REVIEW-REQUIRED. Adding a new
+operations class is inherently a material change - this can never be
+processed as routine, regardless of how minor the requested change
+might seem to the retail agent.
+
+Appetite recheck (per EP-02): FLAGGED - POTENTIAL APPETITE GAP. Solar
+panel installation does not appear on Ironclad's stated accepted class
+list (electrical, plumbing, general contracting, roofing, trucking) NOR
+on their excluded list - this is an UNKNOWN, not a confirmed exclusion.
+Per the same principle established in Market Matching's MM-04
+interpretation notes, an empty/absent entry should not be assumed
+either accepted or excluded - this must be explicitly confirmed with
+the carrier, not processed as if it were routine, and not assumed to
+be automatically declined either.
+
+RECOMMENDATION: Do NOT draft this as a standard endorsement request.
+Instead, draft an inquiry to Ironclad's underwriting team asking
+whether solar panel installation falls within their appetite for this
+account, before assuming it can simply be added. If Ironclad's answer
+is no, this may require a SEPARATE policy placement (as the retail
+agent's own message suggested might be the fallback) rather than an
+endorsement - which would mean this request effectively becomes a new
+Submission Market Matching workflow instance for just the solar
+operations, not an endorsement to the existing policy at all.
+
+This scenario is the clearest illustration in this dataset of why
+endorsement requests that touch operations/class scope can never be
+treated as routine processing, even when the retail agent frames them
+as a simple addition.

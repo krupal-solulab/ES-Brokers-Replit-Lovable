@@ -1,0 +1,16 @@
+{
+  "submission_id": "SUB-3302",
+  "named_insured": "Delta Electric Services LLC",
+  "broker_selected_carriers": ["CAR-02"],
+  "carrier_id": "CAR-02",
+  "carrier_name": "Palmetto Specialty Underwriters",
+  "carrier_requirements": {
+    "required_documents": ["ACORD 125", "ACORD 126", "5-year loss run", "current financials", "supplemental contractor questionnaire"],
+    "min_loss_run_years": 5
+  },
+  "documents_available_from_extraction": ["ACORD 125", "ACORD 126", "current financials"],
+  "missing_info_from_market_matching": [
+    {"item": "Loss run only covers 3 of 5 required years", "required_by": "CAR-02"},
+    {"item": "Supplemental contractor questionnaire not provided", "required_by": "CAR-02"}
+  ]
+}

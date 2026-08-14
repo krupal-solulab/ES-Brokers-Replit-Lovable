@@ -1,0 +1,10 @@
+{
+  "period": "Q3 2027",
+  "submissions_received": 84,
+  "matched_to_carrier": 79,
+  "packages_assembled": 79,
+  "quotes_received": 61,
+  "compared_and_selected": "UNKNOWN - Quote Comparison workflow logging gap identified for 2 weeks in August (system migration)",
+  "bound": 47,
+  "data_completeness": "PARTIAL - 2-week gap in Quote Comparison stage logging during August"
+}

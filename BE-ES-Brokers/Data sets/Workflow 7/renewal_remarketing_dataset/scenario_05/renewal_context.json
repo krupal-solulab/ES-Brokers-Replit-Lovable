@@ -1,0 +1,15 @@
+{
+  "bind_id": "BIND-6604",
+  "named_insured": "Summit Roofing Group LLC",
+  "incumbent_carrier_id": "CAR-03",
+  "incumbent_carrier_name": "Ironclad Casualty Solutions",
+  "incumbent_renewal_offer": {"premium": 187000, "limits": "General Liability $1,000,000/$2,000,000", "deductible": 5000},
+  "remarket_triggered_from": "Scenario 02 - continued severity, disproportionate increase",
+  "alternative_quote_received": {
+    "carrier_name": "Palmetto Specialty Underwriters",
+    "premium": 171000,
+    "limits": "General Liability $1,000,000/$2,000,000",
+    "deductible": 15000,
+    "note": "Palmetto's severity ceiling is normally $150,000 and would typically exclude this account per its stated appetite profile - this quote required a manual underwriting exception per the carrier's cover note, citing improved loss control measures since the original decline"
+  }
+}

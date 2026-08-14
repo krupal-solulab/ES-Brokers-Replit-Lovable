@@ -1,0 +1,13 @@
+{
+  "submission_id": "SUB-3303",
+  "named_insured": "Oakwood Apartment Homes LP",
+  "broker_selected_carriers": ["CAR-04"],
+  "carrier_id": "CAR-04",
+  "carrier_name": "Coastal Mutual Specialty",
+  "carrier_requirements": {
+    "required_documents": ["ACORD 125", "ACORD 140", "5-year loss run", "current financials", "Statement of Values (SOV)"],
+    "supplemental_form": "Coastal Mutual Habitational Supplemental",
+    "supplemental_fields_auto_fillable": ["year_built", "construction_type", "sprinklered", "total_insurable_value", "unit_count_estimate_from_TIV_and_class"]
+  },
+  "documents_available_from_extraction": ["ACORD 125", "ACORD 140", "5-year loss run", "audited financials", "SOV"]
+}

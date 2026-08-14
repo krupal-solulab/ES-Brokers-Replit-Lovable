@@ -1,0 +1,44 @@
+EXPECTED PACKAGE MANIFEST — Summit Roofing Group -> Ironclad Casualty Solutions
+
+STATUS: READY TO SEND
+
+Included documents:
+  [x] ACORD 125, ACORD 126, 5-year loss run (exceeds 3-year minimum),
+      reviewed financials
+
+Diligent search documentation:
+  [x] ATTACHED — 2 admitted-market declinations on file, per MM-07 flag
+      carried over from Market Matching output. Per PA-06, this must be
+      included in the package to Ironclad automatically since the
+      Market Matching stage already confirmed it's required and present
+      - the broker should not have to re-attach it manually.
+
+Draft Cover Letter (excerpt, full text in package):
+"Summit Roofing Group is a 9-year steep-slope roofing contractor
+operating in North Carolina. Loss history includes two bodily injury
+claims related to falls from height, the more recent currently reserved
+at $180,000. Given Ironclad's known appetite for higher-severity
+roofing risk, we're bringing this account directly rather than shopping
+it broadly - loss control has been proactive following the 2025 claim
+(see attached safety program update), and the account has been declined
+by two admitted markets, documentation attached."
+
+TONE NOTES:
+- This cover letter does NOT minimize or bury the loss history the way
+  a package to a more conservative carrier might be tempted to -
+  instead it leads with the loss information proactively, framed around
+  why THIS carrier specifically is a fit for THIS risk profile (per
+  PA-04's carrier-aware tone rule)
+- References the carrier's own stated risk tolerance (from carrier_notes
+  in the profile) directly - this is what "tailored to the carrier" means
+  in practice, not just swapping the carrier's name into a generic
+  template
+- Contrast this explicitly against Scenario 01's tone (Continental
+  Freight -> Vantage): that letter downplayed nothing either, but had
+  nothing severe to proactively frame - this scenario is the harder
+  test of PA-04, where the tone rule has to do real work
+- If "loss control has been proactive following the 2025 claim" isn't
+  grounded in an actual extracted document, this specific claim should
+  be OMITTED from the draft, not included as a plausible-sounding
+  narrative filler - flag this explicitly as a required check before
+  using this draft as a template

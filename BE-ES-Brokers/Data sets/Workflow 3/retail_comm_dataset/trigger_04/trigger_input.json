@@ -1,0 +1,15 @@
+{
+  "trigger_type": "PLACEMENT_CONFIRMATION",
+  "source_workflow": "Manual broker input (Quote Comparison workflow not yet built)",
+  "submission_id": "SUB-3303",
+  "named_insured": "Oakwood Apartment Homes LP",
+  "retail_agent_name": "James Foster",
+  "retail_agency": "Crestview Agency",
+  "agent_relationship_tenure": "5 years, high volume",
+  "carrier_name": "Coastal Mutual Specialty",
+  "bound_terms": {
+    "premium": "$81,500",
+    "limits": "Property $18,000,000 blanket; GL $1,000,000/$2,000,000",
+    "effective_date": "2027-08-15"
+  }
+}

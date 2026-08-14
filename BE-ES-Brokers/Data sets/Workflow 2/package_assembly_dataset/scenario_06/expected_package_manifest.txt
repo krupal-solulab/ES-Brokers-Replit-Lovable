@@ -1,0 +1,20 @@
+EXPECTED PACKAGE MANIFEST — Clearpath Bookkeeping Services -> Apex Excess Lines
+
+STATUS: READY TO SEND
+
+Included documents:
+  [x] ACORD 125, ACORD 126, 3-year loss run, internal financial summary
+
+Draft Cover Letter (excerpt, full text in package):
+"Clearpath Bookkeeping Services is a 4-year bookkeeping and payroll
+processing firm with $365,000 in annual revenue. One prior GL-adjacent
+claim ($9,200, closed) related to a client data-handling dispute - no
+other losses in the review period."
+
+TONE NOTES: baseline clean case - included in this dataset specifically
+as a control. The system's handling of a genuinely simple, low-stakes
+package (small account, one minor prior claim, complete documentation)
+should be efficient and unremarkable - no special flags, no elaborate
+tone-management, just a clean, fast, correct package. Useful for
+confirming the system doesn't over-engineer simple cases while handling
+the harder ones (Scenarios 02, 03, 05) correctly.

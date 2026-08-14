@@ -1,0 +1,16 @@
+EXPECTED OUTPUT — Coastal Mutual / Habitational (Consistently Confirmed)
+
+Signal aggregation (CI-01): 4 of 4 outcomes fully consistent with
+stated profile.
+
+Consistency scoring (CI-02): high consistency, no concerning pattern.
+
+Suppression check (CI-05): SUPPRESSED for suggestion purposes (nothing
+to suggest changing) - but per CI-03, this consistent evidence SHOULD
+still be used to REFRESH the appetite_confidence/appetite_last_updated
+metadata on the profile (a positive confirmation is itself worth
+recording, distinct from generating an actionable "change this"
+suggestion). This is the one case where the workflow writes something
+back automatically - metadata about confidence/recency, never the
+substantive accepted/excluded class data itself, which always requires
+human approval per Scenario 02's constraint.

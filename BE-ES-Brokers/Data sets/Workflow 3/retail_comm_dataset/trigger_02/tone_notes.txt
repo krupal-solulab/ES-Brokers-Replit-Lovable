@@ -1,0 +1,15 @@
+TONE NOTES - Trigger 02
+
+- Explicitly scopes the ask to ONE carrier ("this is just for the
+  second market") - critical given Trigger 01 already told this same
+  agent that Ironclad's submission went in clean; failing to
+  distinguish which ask applies to which carrier would confuse an
+  agent managing multiple simultaneous placements
+- Numbers the specific items rather than a vague "we need more info" -
+  directly reflects Package Assembly's PA-03 specificity requirement
+  carried through into agent-facing language
+- Flags which parts of the supplemental form need the INSURED's input
+  specifically (not just "fill this out") - sets accurate expectations
+  about effort required, consistent with the auto-fill boundary from
+  the Package Assembly PRD (PA-02) - the system won't guess these
+  answers, so the agent needs to know that upfront

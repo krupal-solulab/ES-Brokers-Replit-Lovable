@@ -1,0 +1,12 @@
+{
+  "trigger_type": "SUBMISSION_ACKNOWLEDGMENT",
+  "source_workflow": "Market Matching + Package Assembly",
+  "submission_id": "SUB-3301-multi",
+  "named_insured": "Delta Electric Services LLC",
+  "retail_agent_name": "Rachel Combs",
+  "retail_agency": "Harbor Retail Agency",
+  "agent_relationship_tenure": "2 years, moderate volume",
+  "carriers_approached": ["Ironclad Casualty Solutions", "Meridian Excess & Surplus"],
+  "carrier_statuses": {"Ironclad Casualty Solutions": "READY - submitted", "Meridian Excess & Surplus": "READY_WITH_GAP - submitted with disclosed gap"},
+  "expected_response_window_days": 10
+}

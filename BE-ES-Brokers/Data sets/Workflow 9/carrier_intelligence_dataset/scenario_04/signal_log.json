@@ -1,0 +1,11 @@
+{
+  "carrier_id": "CAR-04",
+  "carrier_name": "Coastal Mutual Specialty",
+  "class_code": "habitational",
+  "observed_outcomes": [
+    {"submission_id": "SUB-D1", "outcome": "quoted", "date": "2027-04-01", "consistent_with_profile": true},
+    {"submission_id": "SUB-D2", "outcome": "quoted", "date": "2027-05-15", "consistent_with_profile": true},
+    {"submission_id": "SUB-D3", "outcome": "quoted", "date": "2027-06-20", "consistent_with_profile": true},
+    {"submission_id": "SUB-D4", "outcome": "quoted", "date": "2027-07-25", "consistent_with_profile": true}
+  ]
+}

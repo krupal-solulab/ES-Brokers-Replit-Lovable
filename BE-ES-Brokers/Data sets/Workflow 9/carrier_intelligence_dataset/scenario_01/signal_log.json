@@ -1,0 +1,8 @@
+{
+  "carrier_id": "CAR-02",
+  "carrier_name": "Palmetto Specialty Underwriters",
+  "class_code": "contractors - roofing (low slope only)",
+  "observed_outcomes": [
+    {"submission_id": "SUB-A", "outcome": "declined", "date": "2027-06-01", "consistent_with_profile": true}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "carrier_id": "CAR-03",
+  "carrier_name": "Ironclad Casualty Solutions",
+  "class_code": "contractors - roofing (all types)",
+  "observed_outcomes": [
+    {"submission_id": "SUB-C1", "outcome": "quoted", "date": "2027-05-01", "consistent_with_profile": true},
+    {"submission_id": "SUB-C2", "outcome": "declined", "date": "2027-06-01", "consistent_with_profile": false, "reason_given": "severity exceeded ceiling for this specific account"},
+    {"submission_id": "SUB-C3", "outcome": "quoted", "date": "2027-07-01", "consistent_with_profile": true}
+  ]
+}
