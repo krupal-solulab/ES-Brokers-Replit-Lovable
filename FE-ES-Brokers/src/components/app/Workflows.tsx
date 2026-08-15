@@ -4564,6 +4564,13 @@ export function RenewalRemarketing() {
       toast.error(err instanceof Error ? err.message : "Failed to check live renewal"),
   });
 
+  // G5 — scheduled monitor alerts for renewal_remarketing (URGENT_REMARKET flagged by scan).
+  const rrMonitorAlertsQuery = useQuery({
+    queryKey: ["monitor-alerts", "renewal_remarketing"],
+    queryFn: () => listMonitorAlerts("renewal_remarketing", false),
+    staleTime: 60_000,
+  });
+
   return (
     <div className="mx-auto max-w-[1500px] animate-in fade-in-0 duration-500">
       <PageHeader
@@ -4669,8 +4676,15 @@ export function RenewalRemarketing() {
                       <span className="truncate font-mono text-sm">
                         {row.submission_id ?? row.id}
                       </span>
-                      <div className="mt-1.5">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         <Chip>{row.status}</Chip>
+                        {(rrMonitorAlertsQuery.data ?? []).some(
+                          (a) => a.entity_ref === row.submission_id,
+                        ) && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary">
+                            <ShieldAlert className="h-3 w-3" /> scan alert
+                          </span>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -4702,7 +4716,14 @@ export function RenewalRemarketing() {
                 </div>
               </Panel>
             ) : payload ? (
-              <LiveRenewalCard itemId={detailQuery.data!.id} payload={payload} onActed={appendLog} />
+              <LiveRenewalCard
+                itemId={detailQuery.data!.id}
+                payload={payload}
+                onActed={appendLog}
+                monitorAlerts={(rrMonitorAlertsQuery.data ?? []).filter(
+                  (a) => a.entity_ref === selectedId || a.entity_ref === payload.bind_id,
+                )}
+              />
             ) : (
               <Panel>
                 <div className="py-10 text-center text-sm text-muted-foreground">
@@ -4786,10 +4807,12 @@ function LiveComparisonOption({
 function LiveRenewalCard({
   itemId,
   payload,
+  monitorAlerts = [],
   onActed,
 }: {
   itemId: string;
   payload: RemarketDecisionPayload;
+  monitorAlerts?: MonitorAlert[];
   onActed: (who: string, what: string, ctx: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -4937,6 +4960,32 @@ function LiveRenewalCard({
           <span className="sm:col-span-2">History: {payload.remarketing_history_detail}</span>
         )}
       </div>
+
+      {/* Scheduled monitor alerts — persisted by background scan, visually distinct per FR-8/FR-22. */}
+      {monitorAlerts.filter((a) => a.alert_type === "RENEWAL_URGENT_REMARKET").map((alert) => (
+        <div
+          key={alert.id}
+          className="mt-4 flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-[12px]"
+        >
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div className="flex-1 text-foreground">
+            <b>Scheduled scan — urgent remarket flagged</b>: incumbent non-response near expiration.
+            {String(alert.payload.trigger_reasoning ?? "") && (
+              <span className="ml-1 text-muted-foreground">
+                {String(alert.payload.trigger_reasoning)}
+              </span>
+            )}
+            {alert.payload.days_until_expiration !== undefined && (
+              <span className="ml-1 font-medium text-destructive">
+                {String(alert.payload.days_until_expiration)}d to expiration.
+              </span>
+            )}
+            <div className="mt-0.5 text-[10px] text-muted-foreground">
+              Flagged {new Date(alert.created_at).toLocaleDateString()}
+            </div>
+          </div>
+        </div>
+      ))}
 
       {comparison && (
         <div className="mt-4">

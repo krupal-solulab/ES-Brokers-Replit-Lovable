@@ -2,3 +2,4 @@
 - [Assembly gap_policy wiring](assembly-gap-policy.md) — _CARRIER_POLICY_OVERRIDES removed; gap_policy threaded via pipeline._gap_policy set by router before run().
 - [G3 Binder Monitors](g3-binder-monitors.md) — two ScheduledMonitors for binder_issuance; import monitors package in main.py + worker.py at module level to register.
 - [G4 Quote Validity Monitor](g4-quote-validity-monitor.md) — quote_validity_window ScheduledMonitor; LAPSED emitted once via cross-day pre-check; broker-acted statuses suppress urgency; FE badge in queue + detail panel alerts.
+- [G5 Renewal Trigger Monitor](g5-renewal-trigger-monitor.md) — renewal_trigger ScheduledMonitor; calls run_live() + enqueues ReviewItem; URGENT_REMARKET emits MonitorAlert + Slack; imports _bind_expiration_and_premium from live_ingestion.py.
