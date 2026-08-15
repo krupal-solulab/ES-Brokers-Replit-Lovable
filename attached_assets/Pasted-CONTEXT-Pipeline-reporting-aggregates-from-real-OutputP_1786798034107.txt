@@ -1,0 +1,41 @@
+CONTEXT
+Pipeline reporting aggregates from real OutputPackage rows (FR-1, correct). Two
+gaps: (a) FR-4 broker/agent-side delay exclusion from carrier timing is
+"deliberately NOT computed here — no real data exists anywhere to measure it
+from"; (b) FR-6 / PR-04 revenue attribution has "no field anywhere in this
+module," so it is absent rather than provisional.
+
+TASK
+1. FR-4: Capture the stage-level timestamps needed to attribute delay. Add
+   append-only `PipelineStageEvent` rows (submission_ref, stage, entered_at,
+   exited_at, attribution: CARRIER|BROKER|AGENT) written by the existing
+   workflows at their existing state transitions (notably Package Assembly BLOCKED
+   entry/exit = BROKER/AGENT-attributed). Then in `reporting_engine`, compute
+   time-to-placement as elapsed minus BROKER/AGENT-attributed spans for
+   carrier-attributed timing metrics. Keep the existing raw-elapsed metric too,
+   clearly labeled, so nothing regresses.
+2. FR-6 / PR-04: Add a revenue-attribution metric computed from a configurable
+   commission-structure config (env/settings-driven), and render it flagged
+   PROVISIONAL until confirmed with the design partner (never as a confirmed
+   figure). If commission config is absent, show "not configured", never a guessed
+   number (Deterministic Logic Boundary / KB06).
+
+EXACT LOGIC
+Delay exclusion subtracts only spans explicitly attributed to BROKER/AGENT — never
+inferred. Revenue = sum(bound_premium * commission_rate) per the config map, with
+each figure carrying `provisional: true`. Both metrics keep FR-3's denominator +
+low-volume annotation already implemented (MIN_RELIABLE_VOLUME).
+
+EDGE CASES
+- A submission with no BLOCKED span: delay-excluded == raw elapsed (identical).
+- Period with a known data gap (FR-2): still display the gap explicitly; do not
+  interpolate the new metrics over it.
+- Missing commission config: metric renders "provisional / not configured", report
+  still generates.
+
+ENDPOINTS
+Extend the existing pipeline reporting `/run` response payload with
+`time_to_placement_carrier_attributed` and `revenue_attribution` (provisional).
+
+Screen(s) wired: Pipeline & Carrier Reporting — carrier timing card shows the
+delay-excluded metric alongside raw; a provisional revenue-attribution tile.

@@ -10,12 +10,10 @@
 import { api } from "./client";
 import type { components } from "./schema";
 
-/** PR-03 (time-to-placement) — added after schema.ts was last generated, so
- * hand-defined here rather than pulled from `components["schemas"]`.
- * `avg_days` is RAW elapsed time (submission matched -> bound);
- * `delay_excluded` is always false today — FR-4's broker/agent-side delay
- * exclusion isn't computed anywhere (Package Assembly has no history of
- * when a submission entered/left BLOCKED status to measure it from). */
+/** PR-03 (time-to-placement) — hand-defined; not yet in generated schema.ts.
+ * `avg_days` is RAW elapsed time (submission matched -> bound).
+ * `delay_excluded` is true when carrier-attributed figures are also available
+ * (see `TimeToPlacementCarrierAttributedOut`). */
 export interface TimeToPlacementOut {
   carrier_name: string;
   submissions_bound: number;
@@ -24,8 +22,36 @@ export interface TimeToPlacementOut {
   delay_excluded: boolean;
 }
 
+/** FR-4 (carrier-attributed time-to-placement) — hand-defined; not yet in
+ * generated schema.ts.  `avg_days_raw` equals `TimeToPlacementOut.avg_days`;
+ * `avg_days_carrier_attributed` is raw minus completed BROKER/AGENT
+ * PipelineStageEvent spans.  Present only when stage events exist. */
+export interface TimeToPlacementCarrierAttributedOut {
+  carrier_name: string;
+  submissions_bound: number;
+  avg_days_raw: number;
+  avg_days_carrier_attributed: number;
+  low_volume_flag: boolean;
+  delay_excluded: boolean;
+}
+
+/** FR-6 / PR-04 (revenue attribution) — always provisional.
+ * `not_configured` is true when no commission rate exists for this carrier.
+ * `estimated_commission` is null when not_configured. */
+export interface RevenueAttributionOut {
+  carrier_name: string;
+  submissions_bound: number;
+  bound_premium_total: number | null;
+  commission_rate: number | null;
+  estimated_commission: number | null;
+  not_configured: boolean;
+  provisional: boolean;
+}
+
 export type PipelineReportPayload = components["schemas"]["PipelineReportPayload"] & {
   time_to_placement: TimeToPlacementOut[];
+  time_to_placement_carrier_attributed: TimeToPlacementCarrierAttributedOut[];
+  revenue_attribution: RevenueAttributionOut[];
 };
 
 // Qualified with the module path — every ES workflow router defines its own

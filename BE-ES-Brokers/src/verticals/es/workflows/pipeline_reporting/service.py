@@ -36,10 +36,14 @@ from verticals.es.workflows.pipeline_reporting.reporting_engine import (
     CarrierPerformance,
     FunnelResult,
     RemarketOutcome,
+    RevenueAttribution,
     TimeToPlacement,
+    TimeToPlacementCarrierAttributed,
     build_carrier_performance,
     build_funnel,
+    build_revenue_attribution,
     build_time_to_placement,
+    build_time_to_placement_carrier_attributed,
     categorize_remarket_outcome,
 )
 from verticals.es.workflows.pipeline_reporting.scenario_loader import load_scenario
@@ -50,6 +54,8 @@ from verticals.es.workflows.pipeline_reporting.schema import (
     FunnelStageOut,
     PipelineReportPayload,
     RemarketOutcomeOut,
+    RevenueAttributionOut,
+    TimeToPlacementCarrierAttributedOut,
     TimeToPlacementOut,
 )
 
@@ -68,6 +74,8 @@ class PipelineReportingPipeline:
         self._funnel: FunnelResult | None = None
         self._carriers: list[CarrierPerformance] = []
         self._placements: list[TimeToPlacement] = []
+        self._carrier_attributed: list[TimeToPlacementCarrierAttributed] = []
+        self._revenue: list[RevenueAttribution] = []
         self._remarket: list[RemarketOutcome] = []
         self._remarket_trigger_summary: dict[str, int] = {}
 
@@ -250,8 +258,29 @@ class PipelineReportingPipeline:
                 TimeToPlacementOut(
                     carrier_name=p.carrier_name, submissions_bound=p.submissions_bound,
                     avg_days=p.avg_days, low_volume_flag=p.low_volume_flag,
+                    delay_excluded=bool(self._carrier_attributed),
                 )
                 for p in self._placements
+            ],
+            time_to_placement_carrier_attributed=[
+                TimeToPlacementCarrierAttributedOut(
+                    carrier_name=p.carrier_name, submissions_bound=p.submissions_bound,
+                    avg_days_raw=p.avg_days_raw,
+                    avg_days_carrier_attributed=p.avg_days_carrier_attributed,
+                    low_volume_flag=p.low_volume_flag,
+                )
+                for p in self._carrier_attributed
+            ],
+            revenue_attribution=[
+                RevenueAttributionOut(
+                    carrier_name=r.carrier_name, submissions_bound=r.submissions_bound,
+                    bound_premium_total=r.bound_premium_total,
+                    commission_rate=r.commission_rate,
+                    estimated_commission=r.estimated_commission,
+                    not_configured=r.not_configured,
+                    provisional=r.provisional,
+                )
+                for r in self._revenue
             ],
             remarketing_value=[
                 RemarketOutcomeOut(
@@ -301,6 +330,19 @@ class PipelineReportingPipeline:
         self._funnel = build_funnel(underlying)
         self._carriers = build_carrier_performance(underlying["carrier_activity"])
         self._placements = build_time_to_placement(underlying["placements"])
+        # FR-4: carrier-attributed time (BROKER/AGENT spans subtracted).
+        # Only populated when PipelineStageEvent rows exist for this tenant.
+        stage_events = underlying.get("stage_events", [])
+        self._carrier_attributed = (
+            build_time_to_placement_carrier_attributed(underlying["placements"], stage_events)
+            if stage_events
+            else []
+        )
+        # FR-6 / PR-04: revenue attribution (always provisional).
+        self._revenue = build_revenue_attribution(
+            underlying.get("bound_submissions", []),
+            underlying.get("commission_config", {}),
+        )
         self._remarket = [
             categorize_remarket_outcome(o) for o in underlying["remarket_outcomes"]
         ]

@@ -117,6 +117,8 @@ import {
   type PipelineReportPayload,
   type RemarketOutcomeOut,
   type TimeToPlacementOut,
+  type TimeToPlacementCarrierAttributedOut,
+  type RevenueAttributionOut,
 } from "@/lib/api/pipelineReporting";
 import {
   ArrowRight,
@@ -6687,34 +6689,109 @@ function LiveReportCard({ payload }: { payload: PipelineReportPayload }) {
       {payload.time_to_placement.length > 0 && (
         <div className="mt-5">
           <div className="mb-2 text-xs font-medium">Time to placement — sorted by volume</div>
+          {!payload.time_to_placement[0]?.delay_excluded && (
+            <div className="mb-2 flex items-start gap-2 rounded-lg border border-warn/30 bg-warn/5 p-2 text-[11px] text-foreground">
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
+              <span>
+                Raw elapsed time only (submission matched → bound). Carrier-attributed figures
+                will appear once Package Assembly BLOCKED entry/exit events are recorded (FR-4).
+              </span>
+            </div>
+          )}
+          <table className="w-full text-sm">
+            <thead className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="py-1.5 text-left">Carrier</th>
+                <th className="py-1.5 text-right">Submissions bound</th>
+                <th className="py-1.5 text-right">Avg. elapsed (raw)</th>
+                {(payload.time_to_placement_carrier_attributed ?? []).length > 0 && (
+                  <th className="py-1.5 text-right">Avg. carrier-attributed</th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {payload.time_to_placement.map((p: TimeToPlacementOut) => {
+                const attributed = (payload.time_to_placement_carrier_attributed ?? []).find(
+                  (a: TimeToPlacementCarrierAttributedOut) => a.carrier_name === p.carrier_name,
+                );
+                return (
+                  <tr key={p.carrier_name}>
+                    <td className="py-2 font-medium">
+                      <div className="flex items-center gap-2">
+                        {p.carrier_name}
+                        {p.low_volume_flag && <Chip tone="warn">Low volume</Chip>}
+                      </div>
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{p.submissions_bound}</td>
+                    <td className="py-2 text-right font-mono">{p.avg_days}d</td>
+                    {(payload.time_to_placement_carrier_attributed ?? []).length > 0 && (
+                      <td className="py-2 text-right font-mono">
+                        {attributed ? (
+                          <span className={attributed.avg_days_carrier_attributed < p.avg_days ? "text-success font-medium" : ""}>
+                            {attributed.avg_days_carrier_attributed}d
+                          </span>
+                        ) : "—"}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {(payload.time_to_placement_carrier_attributed ?? []).length > 0 && (
+            <div className="mt-1.5 text-[10px] text-muted-foreground">
+              Carrier-attributed = raw elapsed minus completed BROKER/AGENT BLOCKED spans (FR-4).
+              Only completed spans subtracted — open spans excluded, never estimated.
+            </div>
+          )}
+        </div>
+      )}
+
+      {(payload.revenue_attribution ?? []).length > 0 && (
+        <div className="mt-5">
+          <div className="mb-2 flex items-center gap-2 text-xs font-medium">
+            Revenue attribution
+            <span className="rounded bg-warn/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warn">
+              Provisional
+            </span>
+          </div>
           <div className="mb-2 flex items-start gap-2 rounded-lg border border-warn/30 bg-warn/5 p-2 text-[11px] text-foreground">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
             <span>
-              Raw elapsed time (submission matched → bound). Broker/agent-side delay is NOT
-              excluded (FR-4) — Package Assembly has no record of when a submission entered or
-              left BLOCKED status, only its current status, so there's no real data to compute
-              that exclusion from.
+              Estimated commission based on configured rates — not confirmed figures. Must be
+              verified with the design partner before use (FR-6 / PR-04).
             </span>
           </div>
           <table className="w-full text-sm">
             <thead className="text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="py-1.5 text-left">Carrier</th>
-                <th className="py-1.5 text-right">Submissions bound</th>
-                <th className="py-1.5 text-right">Avg. elapsed days</th>
+                <th className="py-1.5 text-right">Bound</th>
+                <th className="py-1.5 text-right">Total premium</th>
+                <th className="py-1.5 text-right">Commission rate</th>
+                <th className="py-1.5 text-right">Est. commission</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {payload.time_to_placement.map((p: TimeToPlacementOut) => (
-                <tr key={p.carrier_name}>
-                  <td className="py-2 font-medium">
-                    <div className="flex items-center gap-2">
-                      {p.carrier_name}
-                      {p.low_volume_flag && <Chip tone="warn">Low volume</Chip>}
-                    </div>
+              {(payload.revenue_attribution ?? []).map((r: RevenueAttributionOut) => (
+                <tr key={r.carrier_name}>
+                  <td className="py-2 font-medium">{r.carrier_name}</td>
+                  <td className="py-2 text-right tabular-nums">{r.submissions_bound}</td>
+                  <td className="py-2 text-right font-mono">
+                    {r.bound_premium_total != null ? `$${r.bound_premium_total.toLocaleString()}` : "—"}
                   </td>
-                  <td className="py-2 text-right tabular-nums">{p.submissions_bound}</td>
-                  <td className="py-2 text-right font-mono">{p.avg_days}</td>
+                  <td className="py-2 text-right font-mono">
+                    {r.commission_rate != null ? `${(r.commission_rate * 100).toFixed(1)}%` : (
+                      <span className="text-muted-foreground">not configured</span>
+                    )}
+                  </td>
+                  <td className="py-2 text-right font-mono">
+                    {r.not_configured ? (
+                      <span className="text-muted-foreground italic">not configured</span>
+                    ) : r.estimated_commission != null ? (
+                      <span className="text-warn">~${r.estimated_commission.toLocaleString()}</span>
+                    ) : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

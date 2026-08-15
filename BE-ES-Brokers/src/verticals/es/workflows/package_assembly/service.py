@@ -37,6 +37,7 @@ from core.common.dtos import (
 from core.common.enums import DecisionOutcome
 from core.extraction.service import ExtractionService
 from core.llm.service import LLMService
+from core.models import PipelineStageEvent as StageEventRow
 from verticals.es.workflows.package_assembly.assembly import PackageResult, assemble_package
 from verticals.es.workflows.package_assembly.live_ingestion import (
     build_live_carrier_view,
@@ -304,7 +305,13 @@ class PackageAssemblyPipeline:
         matching named insured (see its docstring) and would raise on any
         real name. ``build_live_extracted_model()`` re-derives the real
         ExtractedModel from this submission's actual persisted documents
-        instead."""
+        instead.
+
+        FR-4 stage event wiring: on BLOCKED result, writes a new
+        ``PipelineStageEvent`` row (entered_at=now, attribution=BROKER).
+        On READY/READY_WITH_GAP, closes any open BLOCKED event for this
+        submission (sets exited_at=now).  The fixture-scenario ``run()``
+        path does NOT write stage events — it has no DB session."""
         self._is_live = True
         payload = await real_market_matching_payload(
             session, ctx, market_matching_review_item_id
@@ -316,4 +323,38 @@ class PackageAssemblyPipeline:
         )
         decision = await self.decide(ctx, data)
         draft = await self.draft(ctx, decision)
-        return await self.package(ctx, data, decision, draft)
+        result = await self.package(ctx, data, decision, draft)
+
+        # FR-4: write stage event on state transition (BLOCKED entry/exit).
+        pkg_status = (result.payload or {}).get("status")
+        if submission_id and pkg_status:
+            now = datetime.now(UTC)
+            if pkg_status == "BLOCKED":
+                # Entry: new stage event for broker-side delay tracking.
+                session.add(StageEventRow(
+                    tenant_id=ctx.tenant_id,
+                    submission_ref=submission_id,
+                    stage="package_assembly_blocked",
+                    entered_at=now,
+                    exited_at=None,
+                    attribution="BROKER",
+                ))
+                await session.commit()
+            else:
+                # Exit: close any open BLOCKED event for this submission.
+                from sqlmodel import col, select  # lazy to keep existing imports minimal
+                open_event = (
+                    await session.execute(
+                        select(StageEventRow).where(
+                            col(StageEventRow.tenant_id) == ctx.tenant_id,
+                            col(StageEventRow.submission_ref) == submission_id,
+                            col(StageEventRow.stage) == "package_assembly_blocked",
+                            col(StageEventRow.exited_at).is_(None),
+                        )
+                    )
+                ).scalar_one_or_none()
+                if open_event is not None:
+                    open_event.exited_at = now
+                    await session.commit()
+
+        return result

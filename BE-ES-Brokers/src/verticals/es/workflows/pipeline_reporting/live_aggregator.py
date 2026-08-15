@@ -1,48 +1,48 @@
 """Additive live-aggregation path for Pipeline & Carrier Performance
 Reporting (PR-01/PR-02/PR-05).
 
-Builds a real funnel / carrier-performance / remarketing-value report from
-actual ``OutputPackage`` rows across the five source workflows for this
-tenant, instead of the static Workflow_19 fixture (``scenario_loader.py``,
-untouched by this module) — the genuine cross-workflow aggregation this
-PRD's FR-1 always described ("aggregate stage-level counts directly from
-each source workflow's own logged events").
+Builds a real funnel / carrier-performance / time-to-placement /
+remarketing-value / revenue-attribution report from actual ``OutputPackage``
+rows across the five source workflows for this tenant, instead of the static
+Workflow_19 fixture (``scenario_loader.py``, untouched by this module).
 
-Honest limitations, by design, not oversight:
-- PR-04 (revenue attribution) has no source data anywhere in this codebase
-  — not attempted here either, exactly like ``reporting_engine.py``.
+FR-4 carrier-attributed time: PipelineStageEvent rows written by Package
+Assembly's run_live() at BLOCKED entry/exit are loaded here and passed to
+``build_time_to_placement_carrier_attributed()`` in the reporting engine.
+When no stage events exist (e.g. no live packages have been assembled yet),
+the carrier-attributed section is empty — the raw metric remains the safe
+fallback.
+
+FR-6 / PR-04 revenue attribution: bound premiums extracted from Binder
+Issuance payloads (``carrier_confirmation.confirmed_terms.premium``, falling
+back to ``requested_bind_terms.premium_estimate``) combined with the
+commission config loaded via ``get_effective_setting()`` (per-tenant override)
+or the global ``Settings.commission_rates_json`` default. Always provisional.
+
+Honest limitations still in force, by design:
 - A remarketing "savings" figure is only ever computed when a remarket was
-  genuinely initiated, resulted in a real carrier switch
-  (``final_decision.outcome == "switched_carrier"``), the comparison was
-  directly comparable, and both incumbent/alternative premiums are
-  present. No workflow in this codebase currently has an action that
-  records a real carrier-switch decision, so today every live remarket
-  outcome honestly resolves to ``confirmation_value``/``not_remarketed`` —
-  never a guessed dollar figure (PR-05's own zero-tolerance rule).
-- Carrier performance groups by carrier NAME — the one join key present
-  consistently across Package Assembly / Quote Comparison / Binder
-  Issuance's real payloads (none of them reliably carry the same
-  ``carrier_id`` for a given carrier).
-- Time-to-placement (PR-03) reports RAW elapsed time (earliest real Market
-  Matching row for a submission_id -> the real Binder Issuance row where a
-  ``carrier_confirmation.binder_number`` is actually set) — never a
-  fabricated one. FR-4's broker/agent-delay exclusion is NOT computed:
-  Package Assembly only stores a submission's CURRENT status, never a
-  history of when it entered/left BLOCKED, so there is no real data
-  anywhere to measure that exclusion duration from (see
-  ``TimeToPlacementOut`` in schema.py).
+  genuinely initiated with a real carrier switch and both premiums are present.
+  No workflow currently records a real carrier-switch decision, so today every
+  live remarket outcome resolves to ``confirmation_value``/``not_remarketed``.
+- Carrier performance groups by carrier NAME — the one consistent join key.
+- Time-to-placement joins on submission_id — the same key used across MM, PA,
+  QC, BI payloads for a single submission.
 """
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
+from core.admin.settings_override import get_effective_setting
 from core.common.dtos import Ctx
+from core.config import get_settings
 from core.models import OutputPackage as OutputPackageRow
+from core.models import PipelineStageEvent as StageEventRow
 
 
 async def _payloads_for(session: AsyncSession, ctx: Ctx, workflow: str) -> list[dict[str, Any]]:
@@ -140,9 +140,9 @@ def _build_time_to_placement_data(
     """PR-03: raw elapsed time from a submission's earliest real Market
     Matching row to the real Binder Issuance row where it was actually
     bound (a real ``carrier_confirmation.binder_number`` on file) — joined
-    by ``submission_id``, the same real join key ``_build_funnel_data``
-    already relies on across these same workflows. FR-4's delay exclusion
-    is NOT applied — see this module's docstring."""
+    by ``submission_id``.  ``submission_id`` is included in each placement
+    dict so ``build_time_to_placement_carrier_attributed()`` can join with
+    PipelineStageEvent rows (FR-4)."""
     matched_at: dict[str, Any] = {}
     for r in mm_rows:
         sub_id = (r.payload or {}).get("submission_id")
@@ -165,8 +165,46 @@ def _build_time_to_placement_data(
         days = (r.created_at.date() - start.date()).days
         if days < 0:
             continue  # out-of-order/clock-skew data — never report a negative elapsed time
-        placements.append({"carrier_name": carrier_name, "days": days})
+        placements.append({"carrier_name": carrier_name, "days": days, "submission_id": sub_id})
     return placements
+
+
+def _extract_bound_premium(bi_payload: dict[str, Any]) -> float | None:
+    """Extract the bound premium from a Binder Issuance payload.
+
+    Prefers ``carrier_confirmation.confirmed_terms.premium`` (the confirmed
+    carrier figure); falls back to ``requested_bind_terms.premium_estimate``
+    (the broker's estimated figure at bind request time). Returns None if
+    neither is present — never fabricates a figure (KB06)."""
+    confirmed = (bi_payload.get("carrier_confirmation") or {}).get("confirmed_terms") or {}
+    premium = confirmed.get("premium")
+    if premium is not None:
+        return float(premium)
+    requested = bi_payload.get("requested_bind_terms") or {}
+    estimate = requested.get("premium_estimate")
+    if estimate is not None:
+        return float(estimate)
+    return None
+
+
+def _build_bound_submissions_data(bi_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Bound submissions with extractable premiums — input for revenue attribution (FR-6 / PR-04).
+
+    Only rows with a real binder number (actually bound) and a real premium
+    value are included. Submissions without a premium are excluded — never
+    guessed (KB06)."""
+    results = []
+    for r in bi_rows:
+        if not (r.get("carrier_confirmation") or {}).get("binder_number"):
+            continue
+        carrier_name = r.get("carrier_name")
+        if not carrier_name:
+            continue
+        premium = _extract_bound_premium(r)
+        if premium is None:
+            continue
+        results.append({"carrier_name": carrier_name, "bound_premium": premium})
+    return results
 
 
 def _build_remarket_outcomes(rr_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -210,12 +248,50 @@ def _build_remarket_outcomes(rr_rows: list[dict[str, Any]]) -> list[dict[str, An
     return outcomes
 
 
+async def _load_stage_events(session: AsyncSession, ctx: Ctx) -> list[dict[str, Any]]:
+    """Load all PipelineStageEvent rows for this tenant as plain dicts.
+
+    Returns empty list if the table is empty (no live packages have been
+    assembled yet) — callers must handle this gracefully (FR-4 section
+    is omitted from the report when no events exist)."""
+    rows = (
+        await session.execute(
+            select(StageEventRow).where(
+                col(StageEventRow.tenant_id) == ctx.tenant_id
+            )
+        )
+    ).scalars().all()
+    return [
+        {
+            "submission_ref": r.submission_ref,
+            "stage": r.stage,
+            "entered_at": r.entered_at,
+            "exited_at": r.exited_at,
+            "attribution": r.attribution,
+        }
+        for r in rows
+    ]
+
+
+def _load_commission_config(tenant_id: str) -> dict[str, float]:
+    """Load the commission-rate config for this tenant.
+
+    Per-tenant override via Admin Panel key ``commission_rates_json`` (JSON
+    object string) takes precedence; falls back to the global
+    ``Settings.commission_rates_json`` env var.  Returns empty dict if
+    neither is set or the JSON is invalid — the reporting engine then marks
+    every carrier "not_configured" (KB06)."""
+    from verticals.es.workflows.pipeline_reporting.reporting_engine import parse_commission_config  # lazy import avoids circular
+    raw = get_effective_setting(tenant_id, "commission_rates_json", get_settings().commission_rates_json)
+    return parse_commission_config(str(raw))
+
+
 async def build_live_underlying_data(session: AsyncSession, ctx: Ctx) -> dict[str, Any]:
     """The live-data equivalent of ``scenario_loader.load_scenario()``'s
     ``underlying_data.json`` shape, built from real cross-workflow rows.
     Unlike a single fixture scenario (which always exercises exactly one
-    report "kind"), this returns funnel + carrier + remarketing data all at
-    once — genuinely everything logged so far for this tenant."""
+    report "kind"), this returns funnel + carrier + time-to-placement +
+    stage-events + revenue-attribution + remarketing data all at once."""
     mm_rows_raw = await _rows_for(session, ctx, "market_matching")
     bi_rows_raw = await _rows_for(session, ctx, "binder_issuance")
     mm_rows = [r.payload for r in mm_rows_raw]
@@ -223,10 +299,15 @@ async def build_live_underlying_data(session: AsyncSession, ctx: Ctx) -> dict[st
     qc_rows = await _payloads_for(session, ctx, "quote_comparison")
     bi_rows = [r.payload for r in bi_rows_raw]
     rr_rows = await _payloads_for(session, ctx, "renewal_remarketing")
+    stage_events = await _load_stage_events(session, ctx)
+    commission_config = _load_commission_config(ctx.tenant_id)
 
     return {
         **_build_funnel_data(mm_rows, pa_rows, qc_rows, bi_rows),
         "carrier_activity": _build_carrier_activity(pa_rows, qc_rows, bi_rows),
         "placements": _build_time_to_placement_data(mm_rows_raw, bi_rows_raw),
+        "stage_events": stage_events,
+        "bound_submissions": _build_bound_submissions_data(bi_rows),
+        "commission_config": commission_config,
         "remarket_outcomes": _build_remarket_outcomes(rr_rows),
     }

@@ -106,6 +106,15 @@ class Settings(BaseSettings):
     # project's own verified sample-dataset scenarios.
     carrier_appetite_min_total_outcomes: int = 3
 
+    # ── Pipeline Reporting commission structure (FR-6 / PR-04) ────────
+    # JSON object mapping carrier_name -> commission_rate (fraction, e.g. 0.12 = 12%).
+    # Per-tenant override: use the Admin Panel PlatformSetting key
+    # "commission_rates_json" (same JSON format).
+    # If absent or empty: revenue attribution renders "not configured" — never
+    # a guessed figure (Deterministic Logic Boundary / KB06).
+    # Example: COMMISSION_RATES_JSON='{"Ironclad Specialty": 0.12, "Vantage E&S": 0.10}'
+    commission_rates_json: str = "{}"
+
 
 @lru_cache
 def get_settings() -> Settings:

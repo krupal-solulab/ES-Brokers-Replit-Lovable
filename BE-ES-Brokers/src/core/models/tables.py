@@ -335,6 +335,40 @@ class PlatformSetting(SQLModel, table=True):
     updated_by: str = Field(sa_column=Column(String, nullable=False))
 
 
+# ── 16. PipelineStageEvent (FR-4 — append-only stage transition log) ─────────
+class PipelineStageEvent(SQLModel, table=True):
+    """Append-only record of when a submission entered/exited a pipeline stage.
+
+    Written by the workflow's ``run_live()`` entry point at state transitions.
+    Rows are never updated except to set ``exited_at`` when the submission
+    leaves the stage (BLOCKED → READY/READY_WITH_GAP in Package Assembly).
+
+    ``attribution`` values:
+      CARRIER  — carrier-side activity (quoting, reviewing)
+      BROKER   — broker-side activity (assembling docs, resolving BLOCKED items)
+      AGENT    — agent-side activity (upstream; treated identically to BROKER
+                 for delay-exclusion purposes in the reporting engine)
+
+    ``submission_ref`` is a plain string join key — it matches the
+    ``submission_id`` field as stored in workflow ``OutputPackage`` payloads
+    (e.g. UUID for live submissions). Not a FK to ``submission.id`` because
+    workflow submission IDs are workflow-specific strings, not always row IDs.
+    """
+
+    __tablename__ = "pipeline_stage_event"
+
+    id: str = _pk()
+    tenant_id: str = Field(sa_column=Column(String, ForeignKey("tenant.id"), nullable=False))
+    submission_ref: str = Field(sa_column=Column(String, nullable=False, index=True))
+    stage: str = Field(sa_column=Column(String, nullable=False))  # e.g. "package_assembly_blocked"
+    entered_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
+    exited_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    attribution: str = Field(sa_column=Column(String, nullable=False))  # CARRIER | BROKER | AGENT
+    created_at: datetime = Field(default_factory=_now, sa_column=_ts_col())
+
+
 # ── 14. JobRun (Phase 1 — Arq job tracking + queryable error queue) ──
 class JobRun(SQLModel, table=True):
     __tablename__ = "job_run"
