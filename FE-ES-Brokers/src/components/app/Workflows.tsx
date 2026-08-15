@@ -5979,6 +5979,13 @@ export function CarrierAppetiteIntelligence() {
     ]);
   }
 
+  // G6 — batch run status: CI_METADATA_REFRESHED + CI_SUGGESTION_CREATED alerts from scheduled scan.
+  const caiBatchAlertsQuery = useQuery({
+    queryKey: ["monitor-alerts", "carrier_appetite_intelligence"],
+    queryFn: () => listMonitorAlerts("carrier_appetite_intelligence", false),
+    staleTime: 60_000,
+  });
+
   const runLiveMutation = useMutation({
     mutationFn: runCarrierAppetiteIntelligenceLive,
     onSuccess: (createdItems) => {
@@ -6037,6 +6044,49 @@ export function CarrierAppetiteIntelligence() {
           </div>
         </div>
       </div>
+
+      {/* G6 — Scheduled batch run status (FR-1): CI_METADATA_REFRESHED + CI_SUGGESTION_CREATED alerts */}
+      {(caiBatchAlertsQuery.data ?? []).length > 0 && (
+        <div className="mb-5">
+          <Panel
+            title="Scheduled batch status"
+            subtitle="Last results from the carrier_appetite_batch periodic scan — Scheduled scan (FR-1)"
+            actions={<FoundationBadge kind="matching" />}
+          >
+            <ul className="divide-y divide-border">
+              {(caiBatchAlertsQuery.data ?? []).map((alert) => (
+                <li key={alert.id} className="flex items-start gap-2 py-3 text-[12px]">
+                  {alert.alert_type === "CI_METADATA_REFRESHED" ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                  ) : (
+                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+                  )}
+                  <div className="flex-1">
+                    <span className="font-medium">
+                      {String(alert.payload.carrier_name ?? alert.payload.carrier_id)}
+                    </span>
+                    {alert.alert_type === "CI_METADATA_REFRESHED" ? (
+                      <span className="ml-1 text-muted-foreground">
+                        — metadata refreshed automatically. Confidence →{" "}
+                        <b>{String(alert.payload.appetite_confidence)}</b>.
+                      </span>
+                    ) : (
+                      <span className="ml-1 text-muted-foreground">
+                        — appetite-shift suggestion created (PENDING_REVIEW).{" "}
+                        {alert.payload.class_level_inconsistent_count != null &&
+                          `${String(alert.payload.class_level_inconsistent_count)} class-level inconsistent outcome(s).`}
+                      </span>
+                    )}
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">
+                      {new Date(alert.created_at).toLocaleDateString()} · Scheduled scan
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <GovKpi

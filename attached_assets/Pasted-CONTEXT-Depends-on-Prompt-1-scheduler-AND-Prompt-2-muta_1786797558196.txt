@@ -1,0 +1,42 @@
+CONTEXT
+Depends on Prompt 1 (scheduler) AND Prompt 2 (mutable profile store). The CI
+consistency engine (CI-01/02/05) and suggestion generation (CI-04) are built, but
+FR-1's periodic batch runs only on demand, and FR-4's metadata write-back has
+nowhere to write ("no mutable Carrier Appetite Profile store exists… that write
+path simply doesn't exist").
+
+TASK
+1. Register a `carrier_appetite_batch` ScheduledMonitor (Prompt 1) that runs the
+   EXISTING CI aggregation + consistency engine per carrier/class on a periodic
+   cadence, consuming only already-logged signals (FR-1 — no new signal
+   collection).
+2. On a CONFIRMED_CONSISTENT result (CI-03), call the narrow
+   `refresh_metadata(...)` write path from Prompt 2 to update ONLY
+   `appetite_confidence` and `appetite_last_updated` (creating a new profile
+   version, source=CI_METADATA_REFRESH). Use the typed two-field DTO so no other
+   field is reachable (FR-4 architectural gate).
+3. On a GENUINE_INCONSISTENCY result (CI-04), write the suggestion into the
+   Prompt 2 suggestion inbox (PENDING_REVIEW) with cited evidence (FR-5); it is
+   surfaced for human approval in the profile management UI (FR-6) — never
+   auto-applied.
+4. On INSUFFICIENT_SIGNAL (CI-05, the default/expected outcome): produce nothing.
+
+EXACT LOGIC
+Reuse `consistency_engine` thresholds (MIN_TOTAL_OUTCOMES,
+MIN_CLASS_LEVEL_INCONSISTENT) and the existing class-level vs account-specific
+scoring verbatim. The monitor adds only scheduling + the two-field write + the
+suggestion persist.
+
+EDGE CASES
+- Account-specific decline must contribute ZERO to class-level evidence (already
+  enforced in the engine — do not regress).
+- Concurrent human edit vs metadata refresh: both preserved as versions (Prompt 2).
+- Suppression is the expected outcome for most carrier/class combos — a low
+  suggestion volume is correct, not a bug.
+
+ENDPOINTS
+Reuse Prompt 2's suggestion approve/dismiss endpoints and Prompt 1's alerts list.
+
+Screen(s) wired: Foundation profile-management suggestion inbox (Prompt 2) now
+receives real CI-04 suggestions; Carrier Appetite Intelligence screen shows batch
+run status.

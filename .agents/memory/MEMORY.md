@@ -3,3 +3,4 @@
 - [G3 Binder Monitors](g3-binder-monitors.md) — two ScheduledMonitors for binder_issuance; import monitors package in main.py + worker.py at module level to register.
 - [G4 Quote Validity Monitor](g4-quote-validity-monitor.md) — quote_validity_window ScheduledMonitor; LAPSED emitted once via cross-day pre-check; broker-acted statuses suppress urgency; FE badge in queue + detail panel alerts.
 - [G5 Renewal Trigger Monitor](g5-renewal-trigger-monitor.md) — renewal_trigger ScheduledMonitor; calls run_live() + enqueues ReviewItem; URGENT_REMARKET emits MonitorAlert + Slack; imports _bind_expiration_and_premium from live_ingestion.py.
+- [G6 Carrier Appetite Batch Monitor](g6-carrier-appetite-batch.md) — carrier_appetite_batch ScheduledMonitor; discover_live_carriers → run_live per carrier; CONFIRMED_CONSISTENT → refresh_metadata (MetadataRefreshDTO gate); GENUINE_INCONSISTENCY → enqueue suggestion; both emit MonitorAlerts.
