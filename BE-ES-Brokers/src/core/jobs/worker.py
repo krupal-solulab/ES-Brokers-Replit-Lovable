@@ -15,6 +15,7 @@ from arq.connections import RedisSettings
 from core.config import get_settings
 from core.jobs.monitor import _cron_to_arq_kwargs, run_scheduled_monitors
 from core.jobs.service import ingest_and_extract
+import verticals.es.monitors  # noqa: F401 — side-effect: registers E&S ScheduledMonitors
 
 _log = logging.getLogger(__name__)
 

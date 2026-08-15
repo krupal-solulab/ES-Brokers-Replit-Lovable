@@ -58,6 +58,7 @@ import {
   type DiscrepancyResolution,
   type PolicyDiscrepancyResolution,
 } from "@/lib/api/binderIssuance";
+import { listMonitorAlerts, dismissMonitorAlert, type MonitorAlert } from "@/lib/api/monitorAlerts";
 import {
   attachLiveIssuedEndorsement,
   CHANGE_TYPES,
@@ -3498,6 +3499,21 @@ function LiveBinderCard({
     enabled: liveInboxOpen,
   });
 
+  // G3 — scheduled monitor alerts for this bind (visually distinct per FR-22).
+  const monitorAlertsQuery = useQuery({
+    queryKey: ["monitor-alerts", "binder_issuance"],
+    queryFn: () => listMonitorAlerts("binder_issuance", false),
+    staleTime: 60_000,
+  });
+  const bindId = payload.bind_id;
+  const bindMonitorAlerts: MonitorAlert[] = (monitorAlertsQuery.data ?? []).filter(
+    (a) => a.entity_ref === bindId || a.entity_ref.startsWith(bindId + ":"),
+  );
+  const timelineMonitorAlerts = bindMonitorAlerts.filter((a) => a.alert_type === "ISSUANCE_OVERDUE");
+  const obligationMonitorAlerts = bindMonitorAlerts.filter(
+    (a) => a.alert_type === "OBLIGATION_REMINDER",
+  );
+
   const attachMutation = useMutation({
     mutationFn: (messageId: string) =>
       liveInboxKind === "policy"
@@ -3809,6 +3825,68 @@ function LiveBinderCard({
           </div>
         </div>
       )}
+
+      {/* Scheduled monitor alerts — persisted by the background scan, distinct from on-read state above (FR-22). */}
+      {timelineMonitorAlerts.map((alert) => (
+        <div
+          key={alert.id}
+          className="mt-4 flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3"
+        >
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div className="flex-1 text-[12px] text-foreground">
+            <b>Scheduled scan — issuance overdue</b>
+            {!!alert.payload.is_assumption && (
+              <span className="ml-1 text-muted-foreground">(assumption-based timeline)</span>
+            )}
+            {" "}— expected by {String(alert.payload.expected_by_date ?? "unknown")}, not yet received.
+            <div className="mt-0.5 text-[10px] text-muted-foreground">
+              Flagged {new Date(alert.created_at).toLocaleDateString()}
+            </div>
+          </div>
+          <button
+            onClick={() =>
+              dismissMonitorAlert(alert.id).then(() => monitorAlertsQuery.refetch())
+            }
+            className="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground"
+          >
+            Dismiss
+          </button>
+        </div>
+      ))}
+
+      {obligationMonitorAlerts.map((alert) => (
+        <div
+          key={alert.id}
+          className="mt-4 flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3"
+        >
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div className="flex-1 text-[12px] text-foreground">
+            <b>Scheduled scan — obligation reminder</b>:{" "}
+            {String(alert.payload.description ?? "")}
+            {alert.payload.days_remaining !== null &&
+              alert.payload.days_remaining !== undefined && (
+                <span className="ml-1 text-muted-foreground">
+                  (
+                  {(alert.payload.days_remaining as number) < 0
+                    ? "past due"
+                    : `${alert.payload.days_remaining}d remaining`}
+                  )
+                </span>
+              )}
+            <div className="mt-0.5 text-[10px] text-muted-foreground">
+              Flagged {new Date(alert.created_at).toLocaleDateString()}
+            </div>
+          </div>
+          <button
+            onClick={() =>
+              dismissMonitorAlert(alert.id).then(() => monitorAlertsQuery.refetch())
+            }
+            className="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground"
+          >
+            Dismiss
+          </button>
+        </div>
+      ))}
 
       {payload.post_bind_ongoing_obligations.length > 0 && (
         <div className="mt-4">

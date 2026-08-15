@@ -22,6 +22,7 @@ from core.db import async_session_factory
 from core.integrations.router import router as integrations_router
 from core.monitors.router import router as monitors_router
 from verticals.es.router import router as es_router
+import verticals.es.monitors  # noqa: F401 — side-effect: registers E&S ScheduledMonitors
 
 
 @asynccontextmanager

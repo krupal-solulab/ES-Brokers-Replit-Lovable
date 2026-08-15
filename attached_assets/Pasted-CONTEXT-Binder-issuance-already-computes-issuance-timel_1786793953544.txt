@@ -1,0 +1,39 @@
+CONTEXT
+Binder issuance already computes issuance-timeline breach and ongoing-obligation
+reminders on demand (`coordination_engine.reminder_due`, elapsed-vs-timeline math)
+but nothing fires them proactively — the router comment states there is no
+scheduled job. Prompt 1 now provides the scheduler + MonitorAlert store.
+
+TASK
+Register TWO ScheduledMonitors (Prompt 1) that re-run the EXISTING binder engine
+logic — do not re-implement the calculations:
+1. `binder_issuance_timeline` (BI-04, FR-10/11): for every bound account with a
+   confirmed bind and no policy documents logged, compare elapsed days since bind
+   confirmation against the applicable issuance timeline (carrier-stated or the
+   configurable 45-day assumption already in FR-9); emit an URGENT MonitorAlert
+   once exceeded. Runs independently of discrepancy/subjectivity state (FR-11).
+2. `binder_ongoing_obligations` (BI-07, FR-17): for every POST_BIND_ONGOING
+   obligation, emit reminder alerts at the configurable intervals already modeled
+   (e.g. 15 and 5 days prior) via the existing `reminder_due` predicate.
+
+EXACT LOGIC
+Reuse `coordination_engine.reminder_due(obligation, as_of)` and the existing
+issuance-timeline elapsed check verbatim. The monitor's only new job is: iterate
+candidate rows for the tenant, call the existing predicate with the scheduler's
+`as_of`, and write MonitorAlert rows (dedupe_key = bind_id + alert_type +
+as_of_day). No new premium/timing math.
+
+EDGE CASES
+- Policy documents already received: timeline monitor emits nothing (closed).
+- Obligation already past due with no prior reminder: emit a single WARN, not one
+  per missed interval.
+- Assumption-based (not carrier-stated) timeline: alert payload must carry the
+  `is_assumption` flag already produced by FR-9 so the UI shows it as an
+  assumption, not a carrier commitment.
+
+ENDPOINTS
+Reuse GET /api/core/monitors/alerts?workflow=binder_issuance from Prompt 1.
+
+Screen(s) wired: Binder Issuance — the unified status view (LiveBinderCard) now
+surfaces issuance-timeline and obligation MonitorAlerts in its existing
+discrepancy/status area, visually distinct per FR-22.
