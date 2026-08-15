@@ -54,7 +54,7 @@ async function parseErrorDetail(res: Response): Promise<string> {
 }
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!API_BASE_URL) {
+  if (API_BASE_URL === undefined) {
     throw new Error("VITE_API_BASE_URL is not set — see .env.example");
   }
 

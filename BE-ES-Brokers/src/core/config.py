@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,7 +28,21 @@ class Settings(BaseSettings):
     # ── Database ─────────────────────────────────────
     # SQLite (async) by default. Postgres example:
     #   postgresql+asyncpg://user:pass@localhost:5432/insurance_os
+    # Replit provides DATABASE_URL as postgresql:// — we normalize it to
+    # postgresql+asyncpg:// and replace sslmode=disable with ssl=disable.
     database_url: str = "sqlite+aiosqlite:///./insurance_os.db"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        """Ensure async driver is used and SSL param is asyncpg-compatible."""
+        if isinstance(v, str):
+            # Replit injects postgresql:// — asyncpg needs postgresql+asyncpg://
+            if v.startswith("postgresql://") and "+asyncpg" not in v:
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            # asyncpg does not understand ?sslmode=... — swap for ?ssl=disable
+            v = v.replace("sslmode=disable", "ssl=disable")
+        return v
 
     # ── Redis / jobs (Arq) — Phase 1 ─────────────────
     redis_url: str = "redis://localhost:6379"

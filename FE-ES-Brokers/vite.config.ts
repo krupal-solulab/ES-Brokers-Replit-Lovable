@@ -14,11 +14,18 @@ export default defineConfig({
   },
   vite: {
     server: {
-      // Reached via a public nip.io hostname (broker.57.174.232.34.nip.io) that
-      // resolves to this same machine's IP — Vite blocks unrecognized Host
-      // headers by default (DNS-rebinding protection). The leading-dot form
-      // matches every subdomain under nip.io for this IP, not just "broker".
-      allowedHosts: [".57.174.232.34.nip.io"],
+      // Allow all hosts so the Replit preview proxy (and nip.io) work without
+      // DNS-rebinding false-positives. Fine for a dev server.
+      allowedHosts: true,
+      // Proxy /api calls to the local FastAPI backend so the browser never needs
+      // to reach a different origin — avoids CORS and port-routing complexity in
+      // the Replit proxied environment.
+      proxy: {
+        "/api": {
+          target: "http://localhost:4000",
+          changeOrigin: true,
+        },
+      },
     },
   },
 });
