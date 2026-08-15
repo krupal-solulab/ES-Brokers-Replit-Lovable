@@ -55,6 +55,18 @@ export function actOnPackageAssembly(itemId: string, action: PackageActionVerb) 
   return api.post<ReviewItemOut>(`${BASE}/${itemId}/${action}`);
 }
 
+/**
+ * FR-20/FR-21: submit the broker-edited cover-letter body to record the
+ * normalized Levenshtein edit distance vs the LLM-generated original.
+ * Distinct from ``actOnPackageAssembly(id, "edit")`` because the /edit
+ * endpoint now requires the edited body in the request.
+ *
+ * ``editedBody`` must be non-empty (backend returns 422 otherwise).
+ */
+export function editPackageAssembly(itemId: string, editedBody: string) {
+  return api.post<ReviewItemOut>(`${BASE}/${itemId}/edit`, { edited_body: editedBody });
+}
+
 /** Additive alongside the fixture-scenario run above: assembles a real
  * package per carrier from an ACTUAL Market Matching review item — genuine
  * Market Matching -> Package Assembly hand-off, not another fixture

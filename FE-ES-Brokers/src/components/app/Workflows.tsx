@@ -17,6 +17,7 @@ import {
 } from "@/lib/api/marketMatching";
 import {
   actOnPackageAssembly,
+  editPackageAssembly,
   getPackageAssembly,
   listPackageAssembly,
   runPackageAssemblyFromMarketMatching,
@@ -26,6 +27,7 @@ import {
 import {
   actOnAgentCommunication,
   complianceClear,
+  editAgentCommunication,
   getAgentCommunication,
   listAgentCommunication,
   runAgentCommunication,
@@ -1239,8 +1241,10 @@ function CarrierPackageCard({
     onSettled: () => setPendingAction(null),
   });
 
+  const [coverLetterText, setCoverLetterText] = useState(payload.cover_letter.body);
+
   const editLogMutation = useMutation({
-    mutationFn: () => actOnPackageAssembly(itemId, "edit"),
+    mutationFn: () => editPackageAssembly(itemId, coverLetterText || payload.cover_letter.body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["package-assembly"] });
     },
@@ -1395,9 +1399,12 @@ function CarrierPackageCard({
       {/* PA-04 */}
       <div className="mt-5">
         <div className="mb-2 text-xs font-medium">Cover letter draft</div>
-        <div className="whitespace-pre-wrap rounded-lg border border-border bg-background p-3 text-sm">
-          {payload.cover_letter.body}
-        </div>
+        <textarea
+          value={coverLetterText}
+          onChange={(e) => setCoverLetterText(e.target.value)}
+          rows={10}
+          className="w-full resize-y rounded-lg border border-border bg-background p-3 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
         {payload.cover_letter.citations.length > 0 && (
           <div className="mt-1 text-[11px] text-muted-foreground">
             Citations: {payload.cover_letter.citations.map((c) => c.source).join(", ")}
@@ -1840,6 +1847,24 @@ export function RetailAgentCopilot({ search = {} }: { search?: Record<string, un
     },
   });
 
+  // FR-17/FR-21: submit the current edited body with the distance metric.
+  // Separate from actionMutation because /edit now requires a body parameter.
+  const editMutation = useMutation({
+    mutationFn: () => editAgentCommunication(selectedId!, composeText),
+    onSuccess: (item) => {
+      appendLog(
+        "You",
+        `Log edit — POST /api/es/agent-communication/${selectedId}/edit`,
+        `Status now "${item.status}" · edit distance recorded`,
+      );
+      toast.success("Edit logged");
+      queryClient.invalidateQueries({ queryKey: ["agent-communication"] });
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : "Failed to log edit");
+    },
+  });
+
   const clearMutation = useMutation({
     mutationFn: () => complianceClear(selectedId!),
     onSuccess: () => {
@@ -2174,11 +2199,8 @@ export function RetailAgentCopilot({ search = {} }: { search?: Record<string, un
                       </Button>
                       <Button
                         variant="secondary"
-                        disabled={actionMutation.isPending}
-                        onClick={() => {
-                          actionMutation.mutate("edit");
-                          toast("Logged as edited — remember to Copy the updated text above");
-                        }}
+                        disabled={editMutation.isPending}
+                        onClick={() => editMutation.mutate()}
                       >
                         Log edit
                       </Button>

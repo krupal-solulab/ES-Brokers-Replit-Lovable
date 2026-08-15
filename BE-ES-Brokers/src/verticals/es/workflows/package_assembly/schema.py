@@ -38,6 +38,11 @@ class CoverLetterCitationOut(BaseModel):
 
 
 class CoverLetterOut(BaseModel):
+    """FR-20/FR-21: ``edit_distance_from_original`` is the normalized Levenshtein
+    ratio (0.0 = unchanged, 1.0 = fully rewritten) written by the /edit endpoint
+    after a broker submits their edited cover-letter body."""
+
+    edit_distance_from_original: float | None = None  # noqa: E501 — appended inline below
     body: str
     citations: list[CoverLetterCitationOut] = []
 

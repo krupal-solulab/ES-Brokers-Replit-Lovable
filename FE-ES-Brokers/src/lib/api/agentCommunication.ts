@@ -45,6 +45,18 @@ export function actOnAgentCommunication(itemId: string, action: AgentCommActionV
   return api.post<ReviewItemOut>(`${BASE}/${itemId}/${action}`);
 }
 
+/**
+ * FR-17/FR-21: submit the broker-edited draft body to record the normalized
+ * Levenshtein edit distance vs the LLM-generated original.  Distinct from
+ * ``actOnAgentCommunication(id, "edit")`` because this endpoint now requires
+ * the edited body in the request — the generic action helper sends no body.
+ *
+ * ``editedBody`` must be non-empty (backend returns 422 otherwise).
+ */
+export function editAgentCommunication(itemId: string, editedBody: string) {
+  return api.post<ReviewItemOut>(`${BASE}/${itemId}/edit`, { edited_body: editedBody });
+}
+
 /** Senior/admin only — clears the compliance-review gate on a No Market Found
  * draft (junior gets a real 403). */
 export function complianceClear(itemId: string) {

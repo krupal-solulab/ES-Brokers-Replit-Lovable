@@ -23,6 +23,7 @@ from sqlmodel import col, select
 
 from core.audit import DefaultAuditService
 from core.common.dtos import AuditEntry, Ctx, WorkflowInput
+from core.utils.edit_distance import levenshtein_distance, normalized_edit_distance
 from core.common.enums import ReviewAction, ReviewStatus, Role
 from core.db import get_session
 from core.llm import build_llm_service
@@ -50,6 +51,15 @@ def _pipeline(session: AsyncSession) -> AgentCommunicationPipeline:
 
 class RunRequest(BaseModel):
     trigger: dict[str, Any]  # shaped like a trigger_XX/trigger_input.json object
+
+
+class EditBodyIn(BaseModel):
+    """FR-17/FR-21: FE submits the broker-edited draft body so the endpoint can
+    compute edit_distance_from_original (normalized Levenshtein ratio) and persist
+    it for the feedback loop. Empty string rejected with 422 — an empty submission
+    is ambiguous and would overwrite a real distance with 1.0 incorrectly."""
+
+    edited_body: str
 
 
 class ReviewItemOut(BaseModel):
@@ -304,20 +314,52 @@ async def send(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
 
 
 @router.post("/{item_id}/edit")
-async def edit(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
-    """Audit-only, no status change (FR-17 logs the edit for the feedback loop;
-    computing a real edit-distance needs the FE's submitted edited body, which
-    is a follow-on enhancement — same simplification package_assembly's own
-    ``/edit`` made)."""
+async def edit(item_id: str, body: EditBodyIn, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
+    """FR-17/FR-21: persist the broker-edited draft body diff metric.
+
+    Accepts the broker's current edited body, computes normalized Levenshtein
+    distance vs the LLM-generated original, and stores it as
+    ``edit_distance_from_original`` in the OutputPackage payload.  No status
+    change — this endpoint is audit-only for ReviewItem state; the metric
+    lives in the payload for the feedback loop (FR-17).
+
+    Rejects empty ``edited_body`` with 422 — an empty submission is likely a
+    client bug (the draft textarea submitted before the user typed anything)
+    and would overwrite a real distance figure incorrectly.
+    """
+    if not body.edited_body.strip():
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "edited_body must not be empty — submit the current draft text as edited_body",
+        )
+
     item = await _item_or_404(item_id, ctx, session)
+    pkg_row = await _pkg_row_for(session, item)
+
+    raw_dist: int | None = None
+    normalized: float | None = None
+    if pkg_row is not None and pkg_row.payload is not None:
+        original_body: str = pkg_row.payload.get("body", "")
+        raw_dist = levenshtein_distance(original_body, body.edited_body)
+        normalized = normalized_edit_distance(original_body, body.edited_body)
+        payload = dict(pkg_row.payload)
+        payload["edit_distance_from_original"] = normalized
+        pkg_row.payload = payload
+        session.add(pkg_row)
+
     await DefaultAuditService().record(
         session, ctx,
         AuditEntry(
             actor="human", who=ctx.user_id, what="edited",
             workflow=WORKFLOW_NAME, tenant_id=ctx.tenant_id, vertical=ctx.vertical,
-            detail={"item_id": item_id},
+            detail={
+                "item_id": item_id,
+                "edit_distance_raw": raw_dist,
+                "edit_distance_normalized": normalized,
+            },
         ),
     )
+    await session.commit()
     return ReviewItemOut(id=item.id, submission_id=item.submission_id, status=item.status.value)
 
 

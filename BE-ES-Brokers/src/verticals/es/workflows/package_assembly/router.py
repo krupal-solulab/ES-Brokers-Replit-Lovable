@@ -15,6 +15,7 @@ from sqlmodel import col, select
 
 from core.audit import DefaultAuditService
 from core.common.dtos import AuditEntry, Ctx, WorkflowInput
+from core.utils.edit_distance import levenshtein_distance, normalized_edit_distance
 from core.common.enums import ReviewAction
 from core.db import get_session
 from core.extraction import DefaultExtractionService
@@ -57,6 +58,15 @@ class RunRequest(BaseModel):
 class RunFromMarketMatchingRequest(BaseModel):
     market_matching_review_item_id: str
     carrier_id: str | None = None  # omit to assemble ALL matched carriers (FR-2/FR-23)
+
+
+class EditBodyIn(BaseModel):
+    """FR-20/FR-21: FE submits the broker-edited cover-letter body so the endpoint
+    can compute edit_distance_from_original (normalized Levenshtein ratio) and
+    persist it to cover_letter.edit_distance_from_original in the package payload.
+    Empty string rejected with 422."""
+
+    edited_body: str
 
 
 class ReviewItemOut(BaseModel):
@@ -273,18 +283,23 @@ async def approve(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItemO
 
 
 @router.post("/{item_id}/edit")
-async def edit(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
-    """FR-20's "Edit" action — logged like any other broker action; the
-    generic ReviewQueueService has no dedicated "edited" status, so this
-    records the audit trail (FR-21) without changing ReviewStatus."""
-    await DefaultAuditService().record(
-        session, ctx,
-        AuditEntry(
-            actor="human", who=ctx.user_id, what="action=edit",
-            workflow=WORKFLOW_NAME, tenant_id=ctx.tenant_id, vertical=ctx.vertical,
-            detail={"item_id": item_id},
-        ),
-    )
+async def edit(item_id: str, body: EditBodyIn, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
+    """FR-20/FR-21: persist the broker-edited cover-letter body diff metric.
+
+    Accepts the broker's current edited cover-letter text, computes normalized
+    Levenshtein distance vs the LLM-generated original ``cover_letter.body``,
+    and stores it as ``cover_letter.edit_distance_from_original`` in the
+    OutputPackage payload.  No ReviewItem status change — audit-only for the
+    feedback loop (FR-21).
+
+    Rejects empty ``edited_body`` with 422.
+    """
+    if not body.edited_body.strip():
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "edited_body must not be empty — submit the current cover-letter text as edited_body",
+        )
+
     item = (
         await session.execute(
             select(ReviewItemRow).where(
@@ -296,6 +311,41 @@ async def edit(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, f"no package-assembly review item '{item_id}'"
         )
+
+    raw_dist: int | None = None
+    normalized: float | None = None
+    if item.output_package_id:
+        pkg_row = (
+            await session.execute(
+                select(OutputPackageRow).where(
+                    col(OutputPackageRow.id) == item.output_package_id
+                )
+            )
+        ).scalar_one_or_none()
+        if pkg_row is not None and pkg_row.payload is not None:
+            original_body: str = (pkg_row.payload.get("cover_letter") or {}).get("body", "")
+            raw_dist = levenshtein_distance(original_body, body.edited_body)
+            normalized = normalized_edit_distance(original_body, body.edited_body)
+            payload = dict(pkg_row.payload)
+            cover_letter = dict(payload.get("cover_letter") or {})
+            cover_letter["edit_distance_from_original"] = normalized
+            payload["cover_letter"] = cover_letter
+            pkg_row.payload = payload
+            session.add(pkg_row)
+
+    await DefaultAuditService().record(
+        session, ctx,
+        AuditEntry(
+            actor="human", who=ctx.user_id, what="action=edit",
+            workflow=WORKFLOW_NAME, tenant_id=ctx.tenant_id, vertical=ctx.vertical,
+            detail={
+                "item_id": item_id,
+                "edit_distance_raw": raw_dist,
+                "edit_distance_normalized": normalized,
+            },
+        ),
+    )
+    await session.commit()
     return ReviewItemOut(id=item.id, submission_id=item.submission_id, status=item.status.value)
 
 
