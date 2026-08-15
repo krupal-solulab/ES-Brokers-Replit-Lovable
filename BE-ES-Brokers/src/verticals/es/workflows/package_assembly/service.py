@@ -106,6 +106,10 @@ class PackageAssemblyPipeline:
         self._carrier_view: dict[str, Any] | None = None
         self._result: PackageResult | None = None
         self._is_live = False
+        # Set by the router (which has a session) before run(); controls PA-03 policy.
+        self._gap_policy: dict[str, str] | None = None
+        # Set alongside _gap_policy; recorded in payload for audit (never "current").
+        self._profile_version_id: str | None = None
 
     async def ingest(self, ctx: Ctx, inp: WorkflowInput) -> RawBundle:
         """Loads the scenario's market_matching_output.json + resolves the
@@ -149,9 +153,10 @@ class PackageAssemblyPipeline:
                     live_completeness_check,
                     loss_run_years_provided=_real_loss_run_years_provided(data),
                 ),
+                gap_policy=self._gap_policy,
             )
             if self._is_live
-            else assemble_package(self._carrier_view, data)
+            else assemble_package(self._carrier_view, data, gap_policy=self._gap_policy)
         )
         self._result = result
 
@@ -270,7 +275,7 @@ class PackageAssemblyPipeline:
             flags=flags,
             missing_info=missing_info,
             citations=draft.citations,
-            payload=payload.model_dump(),
+            payload={**payload.model_dump(), "profile_version_id": self._profile_version_id},
         )
 
     async def run(self, ctx: Ctx, inp: WorkflowInput) -> OutputPackage:

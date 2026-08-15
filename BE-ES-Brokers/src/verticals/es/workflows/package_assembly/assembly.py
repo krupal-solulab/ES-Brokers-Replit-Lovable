@@ -19,13 +19,12 @@ from typing import Any
 from core.common.dtos import Citation, ExtractedModel, ExtractedValue
 from core.common.enums import DocumentKind
 
-# ── PA-03 gap-vs-block policy (v1 placeholder, see Validation_Rules_Test_Dataset.md) ──
-# Global default: block everything. One evidenced override: Vantage (CAR-06)
-# treats a missing NON-STANDARD document type as disclose, not block.
+# ── PA-03 gap-vs-block policy ─────────────────────────────────────────────────
+# Default: block everything. Per-carrier policy is now stored in the
+# CarrierAppetiteProfile.gap_policy field (maps requirement_type -> "block"|"disclose").
+# Historically CAR-06 (Vantage) had {"missing_document_type": "disclose"}; that value
+# is seeded into the DB profile's gap_policy on first seed, not hardcoded here.
 _DEFAULT_POLICY = "block"
-_CARRIER_POLICY_OVERRIDES: dict[str, dict[str, str]] = {
-    "CAR-06": {"missing_document_type": "disclose"},
-}
 
 # Carrier supplemental-form field names that don't exactly match this
 # service's auto-generated extraction key (see extraction.service's
@@ -169,8 +168,16 @@ def _classify_requirement_type(requirement: str, note: str | None) -> str:
     return "missing_document_type"
 
 
-def _resolve_policy(carrier_id: str, requirement_type: str) -> str:
-    return _CARRIER_POLICY_OVERRIDES.get(carrier_id, {}).get(requirement_type, _DEFAULT_POLICY)
+def _resolve_policy(gap_policy: dict[str, str] | None, requirement_type: str) -> str:
+    """Resolve PA-03 gap-vs-block policy from the carrier's profile ``gap_policy`` map.
+
+    ``gap_policy`` is ``CarrierAppetiteProfile.gap_policy`` (maps requirement_type ->
+    "block"|"disclose"). ``None`` means no DB profile found — falls back to the global
+    default (block everything), preserving the same behaviour as before G2.
+    """
+    if gap_policy:
+        return gap_policy.get(requirement_type, _DEFAULT_POLICY)
+    return _DEFAULT_POLICY
 
 
 def _format_citation(citation: Citation | None) -> str | None:
@@ -236,6 +243,7 @@ def assemble_package(
     document_check_fn: Callable[
         [str, list[str], list[dict[str, Any]]], tuple[bool, str | None]
     ] = check_document,
+    gap_policy: dict[str, str] | None = None,
 ) -> PackageResult:
     """The PA-01..PA-06 engine for ONE carrier. PA-07 (precedence ordering)
     is architectural, not exercised here — see the module's docstring and
@@ -267,7 +275,7 @@ def assemble_package(
         )
         if not present:
             req_type = _classify_requirement_type(requirement, note)
-            policy = _resolve_policy(carrier_id, req_type)
+            policy = _resolve_policy(gap_policy, req_type)
             if policy == "block":
                 blocking.append(BlockingItem(item=requirement, reason=note or "not provided"))
             else:

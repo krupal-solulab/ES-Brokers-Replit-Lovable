@@ -1,0 +1,65 @@
+CONTEXT
+Carrier appetite profiles are loaded per-request from static JSON
+(`carrier_profiles/*.json`, read by `decision_core`). There is no mutable store,
+no write path, and no editing surface — the FE Foundation "Edit" button
+(Foundation.tsx ~line 276) is a non-functional stub. Two PRD requirements depend
+on this store existing: Carrier Appetite Intelligence CI-03/FR-4 (auto-refresh two
+metadata fields) and CI-06/FR-6 (approvals reuse "the existing profile management
+interface from Market Matching"), plus Package Assembly FR-9 (gap-vs-blocked config
+should live alongside profile data, not hardcoded in assembly.py).
+
+TASK
+Introduce a versioned, append-only Carrier Appetite Profile store and a management
+interface, WITHOUT changing the matching engine's read behavior beyond its source.
+- Add a `CarrierAppetiteProfile` entity (fields exactly per Market Matching PRD
+  Section 7.1, plus Package Assembly's extended schema fields: proprietary form
+  metadata, ACORD version preference, and a `gap_policy` map of
+  requirement_type -> READY_WITH_GAP|BLOCKED).
+- Seed it from the existing per-dataset JSON panels (one-time importer) so no
+  behavior changes on day one; matching now reads the DB row, falling back to JSON
+  only if the store is empty for a tenant.
+- Versioning per KB05: an "update" inserts a NEW version row; every consuming
+  OutputPackage already stores which data it used — extend it to store the
+  profile `version_id` actually consumed, never "current".
+- Add a NARROW, field-guarded write path used by CI-03 (Prompt 6): a
+  `refresh_metadata(carrier_id, class_ref, appetite_confidence,
+  appetite_last_updated)` service method whose signature makes it structurally
+  impossible to modify class_codes_accepted/excluded/premium_band/severity_ceiling
+  — enforce with a typed DTO that only carries those two fields (FR-4's
+  architectural gate, not a runtime check).
+- Wire the FE Foundation "Edit" button to a real profile editor: view current
+  version, edit non-substantive and substantive fields (human-only), save (creates
+  a new version), and a suggestion-review inbox that renders
+  carrier_appetite_intelligence suggestions (Prompt 6) with Approve/Dismiss.
+  Approvals to substantive fields go through THIS interface only.
+
+DATABASE
+CarrierAppetiteProfile (versioned, append-only): version_id (pk), carrier_id,
+carrier_name, class_codes_accepted[], class_codes_excluded[], states_licensed[],
+premium_band{min,max}, submission_requirements{min_loss_run_years,
+required_documents[], acceptance_window_days}, severity_ceiling{...},
+appetite_confidence (high|medium|low), appetite_last_updated,
+historical_hit_rate_this_class, lines_written[], notes,
+form_metadata (JSON, PA-05), gap_policy (JSON map, PA-03/FR-9),
+supersedes_version_id (nullable), created_at, created_by, source
+(SEED|HUMAN_EDIT|CI_METADATA_REFRESH).
+
+EDGE CASES
+- CI metadata refresh and a concurrent human edit: last-write-wins by version, and
+  both are preserved as distinct versions (audit-complete).
+- Empty store for a tenant: fall back to JSON panel read (no regression to
+  Market Matching's zero-false-inclusion guarantees).
+- Package Assembly must read `gap_policy` from the profile version it consumed,
+  removing the hardcoded `_CARRIER_POLICY_OVERRIDES` in assembly.py (keep the same
+  default when a carrier has no explicit policy).
+
+ENDPOINTS
+GET   /api/es/carrier-profiles                    -> list (latest version each)
+GET   /api/es/carrier-profiles/{carrier_id}       -> current version + history
+POST  /api/es/carrier-profiles/{carrier_id}       -> human edit (new version), RBAC: senior/admin
+POST  /api/es/carrier-profiles/{carrier_id}/suggestions/{sid}/approve -> apply suggestion as new version
+POST  /api/es/carrier-profiles/{carrier_id}/suggestions/{sid}/dismiss
+
+Screen(s) wired: Foundation / Settings — "Carrier appetite profiles" panel (the
+existing non-functional Edit button becomes a working editor + suggestion inbox).
+Package Assembly package cards now source gap-vs-blocked from profile data.

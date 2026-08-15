@@ -7,6 +7,7 @@ The E&S developer mounts each workflow here with a single ``include_router(...)`
 from fastapi import APIRouter
 
 from verticals.es.workflows.agent_communication.router import router as agent_communication_router
+from verticals.es.workflows.carrier_profiles.router import router as carrier_profiles_router
 from verticals.es.workflows.binder_issuance.router import router as binder_issuance_router
 from verticals.es.workflows.carrier_appetite_intelligence.router import (
     router as carrier_appetite_intelligence_router,
@@ -23,6 +24,7 @@ from verticals.es.workflows.renewal_remarketing.router import (
 
 router = APIRouter(prefix="/api/es", tags=["es"])
 
+router.include_router(carrier_profiles_router)
 router.include_router(market_matching_router)
 router.include_router(package_assembly_router)
 router.include_router(agent_communication_router)

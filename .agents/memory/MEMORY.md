@@ -1,0 +1,2 @@
+- [G2 Carrier Profile Store](g2-carrier-profile-store.md) — DB-first versioned profile store; TEST_DATA_ROOT unset so JSON seed always empty; profiles entered via POST endpoint or CI approvals.
+- [Assembly gap_policy wiring](assembly-gap-policy.md) — _CARRIER_POLICY_OVERRIDES removed; gap_policy threaded via pipeline._gap_policy set by router before run().

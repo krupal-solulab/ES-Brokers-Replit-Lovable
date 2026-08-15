@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from core.models.tables import (
     AuditEntry,
+    CarrierAppetiteProfile,
     Connection,
     Decision,
     Document,
@@ -27,6 +28,7 @@ from core.models.tables import (
 
 __all__ = [
     "AuditEntry",
+    "CarrierAppetiteProfile",
     "Connection",
     "Decision",
     "Document",

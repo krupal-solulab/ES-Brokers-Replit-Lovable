@@ -43,6 +43,8 @@ import {
   listIntegrations,
 } from "@/lib/api/integrations";
 import { askAssistant, getAssistantOverview, type ChatMessage } from "@/lib/api/assistant";
+import { listCarrierProfiles, type CarrierProfileVersion } from "@/lib/api/carrierProfiles";
+import { CarrierProfileEditor } from "./CarrierProfileEditor";
 
 const extractionCaps = [
   {
@@ -216,6 +218,19 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 }
 
 export function MatchingRankingCore() {
+  const [editCarrierId, setEditCarrierId] = useState<string | null>(null);
+
+  const { data: profiles = [], isLoading: profilesLoading } = useQuery({
+    queryKey: ["carrier-profiles"],
+    queryFn: listCarrierProfiles,
+  });
+
+  function confidenceLabel(c: string) {
+    if (c === "high") return "High";
+    if (c === "medium") return "Med";
+    return "Low";
+  }
+
   return (
     <div className="mx-auto max-w-[1400px] animate-in fade-in-0 duration-500">
       <PageHeader
@@ -244,43 +259,54 @@ export function MatchingRankingCore() {
             ))}
           </ul>
         </Panel>
-        <Panel title="Carrier appetite profiles" subtitle="Manually-curated · broker-tunable">
-          <ul className="divide-y divide-border">
-            {[
-              {
-                rule: "Kinsale — cold storage / refrigerated warehousing",
-                version: "v3.2",
-                eval: "2,148",
-              },
-              {
-                rule: "James River — liquor liability, hospitality",
-                version: "v2.8",
-                eval: "1,984",
-              },
-              { rule: "Markel — contractor excess", version: "v1.6", eval: "2,110" },
-              { rule: "Palomar Specialty — cold storage excluded", version: "v1.0", eval: "412" },
-              { rule: "Ategrity — habitational / senior care", version: "v2.1", eval: "1,206" },
-              {
-                rule: "Berkley Specialty — senior care professional liab.",
-                version: "v4.0",
-                eval: "1,842",
-              },
-            ].map((r) => (
-              <li key={r.rule} className="flex items-center gap-3 py-3 text-sm">
-                <div className="flex-1">
-                  <div className="font-medium">{r.rule}</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {r.eval} evaluations · {r.version}
+        <Panel title="Carrier appetite profiles" subtitle="Versioned · broker-tunable">
+          {profilesLoading ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading profiles…
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {profiles.map((p: CarrierProfileVersion) => (
+                <li key={p.carrier_id} className="flex items-center gap-3 py-3 text-sm">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{p.carrier_name}</div>
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span>{p.carrier_id}</span>
+                      <span>·</span>
+                      <span
+                        className={
+                          p.appetite_confidence === "high"
+                            ? "text-emerald-600"
+                            : p.appetite_confidence === "low"
+                            ? "text-red-500"
+                            : "text-amber-600"
+                        }
+                      >
+                        {confidenceLabel(p.appetite_confidence)}
+                      </span>
+                      <span>·</span>
+                      <span>{(p.historical_hit_rate_this_class * 100).toFixed(0)}% hit rate</span>
+                    </div>
                   </div>
-                </div>
-                <button className="rounded-md border border-border px-2 py-1 text-[11px] transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                  Edit
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <button
+                    onClick={() => setEditCarrierId(p.carrier_id)}
+                    className="rounded-md border border-border px-2 py-1 text-[11px] transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 shrink-0"
+                  >
+                    Edit
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </Panel>
       </div>
+
+      <CarrierProfileEditor
+        carrierId={editCarrierId}
+        open={editCarrierId !== null}
+        onClose={() => setEditCarrierId(null)}
+      />
     </div>
   );
 }

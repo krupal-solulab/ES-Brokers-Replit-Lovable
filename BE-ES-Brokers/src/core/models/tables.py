@@ -273,7 +273,54 @@ class MonitorAlert(SQLModel, table=True):
     resolved_by: str | None = Field(default=None, sa_column=Column(String, nullable=True))
 
 
-# ── 14. PlatformSetting (Admin Panel — per-tenant override of an env tunable) ──
+# ── 14. CarrierAppetiteProfile (versioned, append-only — G2) ─────────────────
+class CarrierAppetiteProfile(SQLModel, table=True):
+    """Versioned carrier appetite profile.
+
+    An "update" inserts a NEW row; old rows are never mutated or deleted.
+    ``supersedes_version_id`` chains versions for a carrier.
+    Latest version = MAX(created_at) per (tenant_id, carrier_id).
+
+    ``source`` values: SEED | HUMAN_EDIT | CI_METADATA_REFRESH
+    ``appetite_confidence`` values: high | medium | low
+    ``gap_policy``: maps requirement_type -> "block"|"disclose" (PA-03/FR-9).
+    """
+
+    __tablename__ = "carrier_appetite_profile"
+
+    version_id: str = _pk()
+    tenant_id: str = Field(sa_column=Column(String, ForeignKey("tenant.id"), nullable=False))
+    carrier_id: str = Field(sa_column=Column(String, nullable=False, index=True))
+    carrier_name: str = Field(sa_column=Column(String, nullable=False))
+
+    # ── Core appetite fields ──────────────────────────────────────────────────
+    class_codes_accepted: list = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    class_codes_excluded: list = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    states_licensed: list = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    premium_band: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    submission_requirements: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    severity_ceiling: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    appetite_confidence: str = Field(sa_column=Column(String, nullable=False))
+    appetite_last_updated: str | None = Field(default=None, sa_column=Column(String, nullable=True))
+    historical_hit_rate_this_class: float = Field(default=0.5)
+    lines_written: list = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    notes: str | None = Field(default=None, sa_column=Column(String, nullable=True))
+
+    # ── Extended fields (Package Assembly) ────────────────────────────────────
+    # PA-05 proprietary form metadata (ACORD version preference, form IDs, etc.)
+    form_metadata: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    # PA-03/FR-9: requirement_type -> "block" | "disclose". Empty = use default.
+    gap_policy: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+
+    # ── Versioning (KB05) ─────────────────────────────────────────────────────
+    supersedes_version_id: str | None = Field(default=None, sa_column=Column(String, nullable=True))
+    created_at: datetime = Field(default_factory=_now, sa_column=_ts_col())
+    created_by: str = Field(sa_column=Column(String, nullable=False))
+    # SEED | HUMAN_EDIT | CI_METADATA_REFRESH
+    source: str = Field(sa_column=Column(String, nullable=False))
+
+
+# ── 15. PlatformSetting (Admin Panel — per-tenant override of an env tunable) ──
 class PlatformSetting(SQLModel, table=True):
     __tablename__ = "platform_setting"
     __table_args__ = (

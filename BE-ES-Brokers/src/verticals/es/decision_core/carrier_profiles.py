@@ -120,10 +120,33 @@ def load_carrier_panel(n: int) -> list[CarrierProfile]:
     return profiles
 
 
+async def load_carrier_panel_db(
+    session: object,
+    tenant_id: str,
+    workflow_n: int,
+) -> list["CarrierProfile"]:
+    """Async DB-first carrier panel load for use from pipeline ``decide()`` methods.
+
+    Tries the DB store (``CarrierProfileService.get_profiles_for_matching``)
+    first; falls back to the JSON file panel when the store is empty for this
+    tenant.  Import is deferred to avoid a circular-import cycle between
+    ``decision_core`` and ``carrier_profile_store``.
+    """
+    from verticals.es.carrier_profile_store import CarrierProfileService  # deferred
+
+    from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore[attr-defined]
+
+    assert isinstance(session, AsyncSession), "session must be an AsyncSession"
+    return await CarrierProfileService.get_profiles_for_matching(
+        session, tenant_id, workflow_n  # type: ignore[arg-type]
+    )
+
+
 __all__ = [
     "CarrierProfile",
     "PremiumBand",
     "SeverityCeiling",
     "SubmissionRequirements",
     "load_carrier_panel",
+    "load_carrier_panel_db",
 ]
