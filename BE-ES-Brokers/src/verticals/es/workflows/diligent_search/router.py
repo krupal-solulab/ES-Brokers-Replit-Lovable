@@ -33,6 +33,7 @@ from core.models import OutputPackage as OutputPackageRow
 from core.models import ReviewItem as ReviewItemRow
 from core.review_queue import AuthorityError, DefaultReviewQueueService
 from core.tenancy.dependencies import get_ctx
+from verticals.es.retention_reference_loader import load_all as _load_retention_ref
 from verticals.es.workflows.diligent_search.live_ingestion import discover_live_stub_submissions
 from verticals.es.workflows.diligent_search.schema import ComplianceRecordPayload
 from verticals.es.workflows.diligent_search.service import (
@@ -124,8 +125,15 @@ async def _payload_for(
 
 @router.post("/run", status_code=status.HTTP_201_CREATED)
 async def run_diligent_search(body: RunRequest, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
+    # FR-8: load retention reference from DB before running the pipeline.
+    # Empty dict when the table has no rows — null for all states (no regression).
+    retention_ref = await _load_retention_ref(session)
     pipeline = _pipeline()
-    output = await pipeline.run(ctx, WorkflowInput(source_ref=body.scenario_ref))
+    output = await pipeline.run(
+        ctx,
+        WorkflowInput(source_ref=body.scenario_ref),
+        retention_reference=retention_ref,
+    )
 
     review_queue = DefaultReviewQueueService()
     item = await review_queue.enqueue(session, ctx, output, WORKFLOW_NAME)
@@ -200,6 +208,8 @@ async def run_diligent_search_live(
             declinations = [d.model_dump() for d in s.declinations]
         states.append({"state": s.state, "requirement": requirement, "declinations": declinations})
 
+    # FR-8: load retention reference from DB before running the pipeline.
+    retention_ref = await _load_retention_ref(session)
     pipeline = _pipeline()
     output = await pipeline.run_live(
         ctx,
@@ -208,6 +218,7 @@ async def run_diligent_search_live(
             "named_insured": body.named_insured,
             "states": states,
         },
+        retention_reference=retention_ref,
     )
 
     pkg.payload = output.payload

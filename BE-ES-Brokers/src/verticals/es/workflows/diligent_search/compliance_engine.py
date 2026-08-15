@@ -67,6 +67,10 @@ class StateDetermination:
     sufficiency_status: str = "NOT_APPLICABLE"  # SUFFICIENT | INSUFFICIENT | NOT_APPLICABLE
     gap_detail: str | None = None
     document_eligible: bool = False  # True only when SUFFICIENT — DS-04's generation gate
+    # FR-8: populated from StateRetentionReference when reference data exists;
+    # None when no row exists for this state (pending, never guessed).
+    retention_period_years: int | None = None
+    retention_source: str | None = None  # statutory citation for traceability
 
 
 def _parse_declinations(raw: list[dict[str, Any]] | None) -> list[Declination]:
@@ -82,7 +86,7 @@ def _parse_declinations(raw: list[dict[str, Any]] | None) -> list[Declination]:
     ]
 
 
-def determine_state(
+def _determine_state_base(
     state: str,
     requirement: dict[str, Any] | None,
     declinations_raw: list[dict[str, Any]] | None,
@@ -166,6 +170,44 @@ def determine_state(
         declinations_on_file=declinations,
         sufficiency_status="INSUFFICIENT",
         gap_detail=detail,
+    )
+
+
+def determine_state(
+    state: str,
+    requirement: dict[str, Any] | None,
+    declinations_raw: list[dict[str, Any]] | None,
+    *,
+    retention_reference: dict[str, tuple[int, str]] | None = None,
+) -> StateDetermination:
+    """DS-01/DS-02/DS-03 for exactly one state, with FR-8 retention lookup.
+
+    Delegates all compliance logic to ``_determine_state_base()`` unchanged,
+    then applies a pure lookup against ``retention_reference`` (a plain
+    {state: (years, citation)} dict loaded from the DB by the router before
+    each run).
+
+    FR-8 grounding guarantee: if ``retention_reference`` is absent or has
+    no entry for this state, ``retention_period_years`` and
+    ``retention_source`` remain None — the "never guess" invariant is
+    structurally enforced, not just a convention.  No fallback, no default,
+    no sibling-state inheritance (FR-1/FR-6: each state is independent).
+    """
+    det = _determine_state_base(state, requirement, declinations_raw)
+    if not retention_reference or state not in retention_reference:
+        return det  # no reference entry → null, pending (unchanged behavior)
+    years, citation = retention_reference[state]
+    return StateDetermination(
+        state=det.state,
+        requirement_status=det.requirement_status,
+        exemption_basis=det.exemption_basis,
+        declinations_required=det.declinations_required,
+        declinations_on_file=det.declinations_on_file,
+        sufficiency_status=det.sufficiency_status,
+        gap_detail=det.gap_detail,
+        document_eligible=det.document_eligible,
+        retention_period_years=years,
+        retention_source=citation,
     )
 
 

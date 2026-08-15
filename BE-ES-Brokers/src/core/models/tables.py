@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import CheckConstraint, Column, ForeignKey, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.types import JSON, DateTime
 from sqlmodel import Field, SQLModel
@@ -333,6 +333,43 @@ class PlatformSetting(SQLModel, table=True):
     value: str = Field(sa_column=Column(String, nullable=False))  # caller casts to real type
     updated_at: datetime = Field(default_factory=_now, sa_column=_ts_col())
     updated_by: str = Field(sa_column=Column(String, nullable=False))
+
+
+# ── 17. StateRetentionReference (FR-8 — statutory record-retention lookup) ───
+class StateRetentionReference(SQLModel, table=True):
+    """FR-8: authoritative state → retention_period_years lookup table.
+
+    Populated from a supplied reference file (a required discovery input from
+    the operator — never derived from general knowledge). When no row exists
+    for a state, the compliance engine returns ``retention_period_years=null``
+    and marks the determination pending (current behavior, never regressed).
+
+    Rows are global (no tenant_id) — state retention requirements are
+    statutory and do not vary by tenant. Load via
+    ``verticals.es.retention_reference_loader.load_from_file()`` or insert
+    rows directly for development/testing.
+
+    ``loaded_from`` records the filename the row was loaded from, for
+    traceability: an operator can always answer "where did this figure come
+    from?" by reading this column.
+    """
+
+    __tablename__ = "state_retention_reference"
+
+    id: str = _pk()
+    state: str = Field(
+        sa_column=Column(String, nullable=False, unique=True, index=True)
+    )  # ISO 3166-2 US state code, e.g. "CA", "TX", "FL"
+    retention_period_years: int = Field(
+        sa_column=Column(Integer, nullable=False)
+    )
+    source_citation: str = Field(
+        sa_column=Column(String, nullable=False)
+    )  # e.g. "CAL. INS. CODE § 1764.2(a)"
+    loaded_from: str | None = Field(
+        default=None, sa_column=Column(String, nullable=True)
+    )  # source filename for traceability
+    created_at: datetime = Field(default_factory=_now, sa_column=_ts_col())
 
 
 # ── 16. PipelineStageEvent (FR-4 — append-only stage transition log) ─────────

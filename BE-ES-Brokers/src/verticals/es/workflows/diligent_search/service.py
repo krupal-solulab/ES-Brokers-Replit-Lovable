@@ -63,6 +63,10 @@ class DiligentSearchPipeline:
         self._determinations: list[StateDetermination] = []
         self._overall_status: str = "COMPLETE"
         self._document_texts: dict[str, str] = {}
+        # FR-8: loaded from DB by the router before each run; empty dict
+        # means "no reference data" → retention_period_years stays null
+        # for all states (never guessed).
+        self._retention_reference: dict[str, tuple[int, str]] = {}
 
     async def ingest(self, ctx: Ctx, inp: WorkflowInput) -> RawBundle:
         scenario_ref = inp.source_ref or inp.submission_id
@@ -87,8 +91,9 @@ class DiligentSearchPipeline:
                 )
             ]
 
+        ref = self._retention_reference or None
         self._determinations = [
-            determine_state(state, requirement, declinations)
+            determine_state(state, requirement, declinations, retention_reference=ref)
             for state, requirement, declinations in states_to_check
         ]
         self._overall_status = compute_overall_status(self._determinations)
@@ -221,7 +226,10 @@ class DiligentSearchPipeline:
                 gap_detail=det.gap_detail,
                 document_generated=det.document_eligible,
                 generated_document_text=self._document_texts.get(det.state),
-                retention_period_years=None,  # FR-8: not yet sourced, never guessed
+                # FR-8: populated from reference data when available; null when not.
+                # The engine's determine_state() guarantees this is never guessed.
+                retention_period_years=det.retention_period_years,
+                retention_source=det.retention_source,
             )
             for det in self._determinations
         ]
@@ -245,14 +253,30 @@ class DiligentSearchPipeline:
             payload=payload.model_dump(),
         )
 
-    async def run(self, ctx: Ctx, inp: WorkflowInput) -> OutputPackage:
+    async def run(
+        self,
+        ctx: Ctx,
+        inp: WorkflowInput,
+        *,
+        retention_reference: dict[str, tuple[int, str]] | None = None,
+    ) -> OutputPackage:
+        """FR-8: ``retention_reference`` is ``{state: (years, citation)}`` loaded
+        from ``StateRetentionReference`` rows by the router before calling this
+        method.  Empty / absent → null for all states (never guessed)."""
+        self._retention_reference = retention_reference or {}
         raw = await self.ingest(ctx, inp)
         data = await self.extract(ctx, raw)
         decision = await self.decide(ctx, data)
         draft = await self.draft(ctx, decision)
         return await self.package(ctx, data, decision, draft)
 
-    async def run_live(self, ctx: Ctx, context: dict[str, Any]) -> OutputPackage:
+    async def run_live(
+        self,
+        ctx: Ctx,
+        context: dict[str, Any],
+        *,
+        retention_reference: dict[str, tuple[int, str]] | None = None,
+    ) -> OutputPackage:
         """Additive entry point, alongside ``run()``'s fixture-scenario path
         above — a real determination built from broker/compliance-supplied
         per-state facts and declination records for a real, MM-07-seeded
@@ -263,11 +287,15 @@ class DiligentSearchPipeline:
         sourced from a human instead of ``scenario_loader``. DS-01..DS-04's
         strict, unmodified logic decides sufficiency/generation exactly as
         it does today — this method supplies inputs, never a shortcut
-        around the gate."""
+        around the gate.
+
+        FR-8: ``retention_reference`` loaded from DB by router before call."""
         self._submission_id = context.get("submission_id")
         self._named_insured = context.get("named_insured")
+        ref = retention_reference or None
         self._determinations = [
-            determine_state(s["state"], s.get("requirement"), s.get("declinations"))
+            determine_state(s["state"], s.get("requirement"), s.get("declinations"),
+                            retention_reference=ref)
             for s in context.get("states", [])
         ]
         self._overall_status = compute_overall_status(self._determinations)

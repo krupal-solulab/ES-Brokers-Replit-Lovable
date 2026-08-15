@@ -13,7 +13,12 @@ import type { components } from "./schema";
 export type ReviewItemOut =
   components["schemas"]["verticals__es__workflows__diligent_search__router__ReviewItemOut"];
 export type ComplianceRecordPayload = components["schemas"]["ComplianceRecordPayload"];
-export type StateDeterminationOut = components["schemas"]["StateDeterminationOut"];
+// Extended with retention_source — added to backend schema (FR-8) but not yet
+// reflected in the generated schema.d.ts.  retention_period_years already
+// exists in the generated type (as number | null); retention_source is additive.
+export type StateDeterminationOut = components["schemas"]["StateDeterminationOut"] & {
+  retention_source?: string | null;
+};
 
 const BASE = "/api/es/diligent-search";
 

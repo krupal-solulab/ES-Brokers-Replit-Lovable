@@ -5580,11 +5580,15 @@ function LiveStateDetermination({ s }: { s: StateDeterminationOut }) {
       )}
       {s.retention_period_years == null ? (
         <div className="mt-2 text-[10px] text-muted-foreground">
-          Retention period: not yet sourced (FR-8 — never guessed).
+          Retention period: not yet sourced — reference data not loaded for this state (FR-8).
         </div>
       ) : (
         <div className="mt-2 text-[10px] text-muted-foreground">
-          Retention period: {s.retention_period_years} years
+          Retention period:{" "}
+          <span className="font-medium text-foreground">{s.retention_period_years} years</span>
+          {s.retention_source && (
+            <span className="ml-1 text-muted-foreground">({s.retention_source})</span>
+          )}
         </div>
       )}
     </li>

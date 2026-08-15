@@ -28,7 +28,8 @@ class StateDeterminationOut(BaseModel):
     gap_detail: str | None = None
     document_generated: bool = False
     generated_document_text: str | None = None
-    retention_period_years: int | None = None  # null: not yet sourced (FR-8) — v1 never guesses
+    retention_period_years: int | None = None  # null: no reference row for this state (FR-8)
+    retention_source: str | None = None  # statutory citation; null when retention_period_years is null
 
 
 class ComplianceRecordPayload(BaseModel):
