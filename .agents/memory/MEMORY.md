@@ -1,3 +1,4 @@
 - [G2 Carrier Profile Store](g2-carrier-profile-store.md) — DB-first versioned profile store; TEST_DATA_ROOT unset so JSON seed always empty; profiles entered via POST endpoint or CI approvals.
 - [Assembly gap_policy wiring](assembly-gap-policy.md) — _CARRIER_POLICY_OVERRIDES removed; gap_policy threaded via pipeline._gap_policy set by router before run().
 - [G3 Binder Monitors](g3-binder-monitors.md) — two ScheduledMonitors for binder_issuance; import monitors package in main.py + worker.py at module level to register.
+- [G4 Quote Validity Monitor](g4-quote-validity-monitor.md) — quote_validity_window ScheduledMonitor; LAPSED emitted once via cross-day pre-check; broker-acted statuses suppress urgency; FE badge in queue + detail panel alerts.

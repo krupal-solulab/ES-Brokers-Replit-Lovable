@@ -2572,6 +2572,13 @@ export function QuoteComparison({ search = {} }: { search?: Record<string, unkno
     enabled: liveInboxOpen && Boolean(upstreamSubmissionId),
   });
 
+  // G4 — scheduled monitor alerts for the whole quote_comparison workflow.
+  const qcMonitorAlertsQuery = useQuery({
+    queryKey: ["monitor-alerts", "quote_comparison"],
+    queryFn: () => listMonitorAlerts("quote_comparison", false),
+    staleTime: 60_000,
+  });
+
   const runLiveMutation = useMutation({
     mutationFn: (messageId: string) => runQuoteComparisonLive(upstreamSubmissionId!, messageId),
     onSuccess: (item) => {
@@ -2742,8 +2749,17 @@ export function QuoteComparison({ search = {} }: { search?: Record<string, unkno
                       <span className="truncate font-mono text-sm">
                         {row.submission_id ?? row.id}
                       </span>
-                      <div className="mt-1.5">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         <Chip>{row.status}</Chip>
+                        {(qcMonitorAlertsQuery.data ?? []).some(
+                          (a) =>
+                            a.entity_ref === row.id ||
+                            a.entity_ref.startsWith(row.id + ":"),
+                        ) && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary">
+                            <ShieldAlert className="h-3 w-3" /> scan alert
+                          </span>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -2775,7 +2791,16 @@ export function QuoteComparison({ search = {} }: { search?: Record<string, unkno
                 </div>
               </Panel>
             ) : payload ? (
-              <LiveComparisonCard itemId={detailQuery.data!.id} payload={payload} onActed={appendLog} />
+              <LiveComparisonCard
+                itemId={detailQuery.data!.id}
+                payload={payload}
+                onActed={appendLog}
+                monitorAlerts={(qcMonitorAlertsQuery.data ?? []).filter(
+                  (a) =>
+                    a.entity_ref === selectedId ||
+                    a.entity_ref.startsWith(selectedId! + ":"),
+                )}
+              />
             ) : (
               <Panel>
                 <div className="py-10 text-center text-sm text-muted-foreground">
@@ -2971,10 +2996,12 @@ function LiveQuoteRow({
 function LiveComparisonCard({
   itemId,
   payload,
+  monitorAlerts = [],
   onActed,
 }: {
   itemId: string;
   payload: ComparisonPayload;
+  monitorAlerts?: MonitorAlert[];
   onActed: (who: string, what: string, ctx: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -3082,6 +3109,39 @@ function LiveComparisonCard({
           ))}
         </div>
       )}
+
+      {/* Scheduled monitor alerts — persisted by background scan, distinct from on-read urgency above (FR-22). */}
+      {monitorAlerts.filter((a) => a.alert_type !== "QUOTE_LAPSED").map((alert) => (
+        <div
+          key={alert.id}
+          className="mt-2 flex items-start gap-2 rounded border border-primary/30 bg-primary/5 p-2 text-[12px] text-muted-foreground"
+        >
+          <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+          <span>
+            <b className="text-foreground">
+              Scheduled scan — {String(alert.payload.flag_type ?? alert.alert_type)}:
+            </b>{" "}
+            {String(alert.payload.detail ?? "")}
+            <span className="ml-1 text-[10px]">
+              (flagged {new Date(alert.created_at).toLocaleDateString()})
+            </span>
+          </span>
+        </div>
+      ))}
+      {monitorAlerts.filter((a) => a.alert_type === "QUOTE_LAPSED").map((alert) => (
+        <div
+          key={alert.id}
+          className="mt-2 flex items-start gap-2 rounded border border-muted/40 bg-muted/5 p-2 text-[12px] text-muted-foreground"
+        >
+          <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span>
+            <b className="text-foreground">Scheduled scan — quote lapsed</b>
+            <span className="ml-1 text-[10px]">
+              (detected {new Date(alert.created_at).toLocaleDateString()})
+            </span>
+          </span>
+        </div>
+      ))}
 
       <ul className="mt-4 space-y-2">
         {payload.quotes.map((q) => (

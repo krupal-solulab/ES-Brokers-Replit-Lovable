@@ -6,5 +6,6 @@ the registry is populated at both API and worker startup.
 """
 
 from verticals.es.monitors import binder_issuance as _binder_issuance  # noqa: F401 (side-effect)
+from verticals.es.monitors import quote_comparison as _quote_comparison  # noqa: F401 (side-effect)
 
 __all__: list[str] = []
