@@ -92,6 +92,12 @@ class Settings(BaseSettings):
     quote_rank_price_weight: float = 1.0
     quote_rank_subjectivity_penalty: float = 0.0
 
+    # ── Monitors / scheduled jobs ─────────────────────────────────
+    # Default cron cadence for all scheduled monitors.  Format: "minute hour * * *".
+    # Supports fixed values and */N intervals for the minute and hour fields only.
+    # Per-monitor override: MONITOR_CRON_<MONITOR_NAME> (same format).
+    monitor_cron_default: str = "0 */6 * * *"
+
     # ── Carrier Appetite Intelligence signal threshold (CI-01/FR-3) ──
     # Minimum total real declinations from ONE carrier before any pattern
     # judgment fires (never off a single data point) — FR-3 explicitly

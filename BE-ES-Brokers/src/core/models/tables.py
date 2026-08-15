@@ -237,7 +237,43 @@ class Connection(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now, sa_column=_ts_col())
 
 
-# ── 13. PlatformSetting (Admin Panel — per-tenant override of an env tunable) ──
+# ── 13. MonitorAlert (scheduled-monitor output — append-only, deduplicated) ───
+class MonitorAlert(SQLModel, table=True):
+    """Append-only alert produced by a ScheduledMonitor run.
+
+    Resolution sets ``resolved_at``; rows are never deleted.
+    ``dedupe_key`` is unique across the table — computed as
+    ``"{tenant_id}:{alert_type}:{entity_ref}:{as_of_day}"`` — so re-running the
+    same monitor on the same day for the same entity never creates duplicates.
+    """
+
+    __tablename__ = "monitor_alert"
+    __table_args__ = (
+        UniqueConstraint("dedupe_key", name="uq_monitor_alert_dedupe_key"),
+    )
+
+    id: str = _pk()
+    tenant_id: str = Field(sa_column=Column(String, ForeignKey("tenant.id"), nullable=False))
+    vertical: Vertical = Field(sa_column=_enum_col(Vertical))
+    # The workflow module that owns this alert (e.g. "binder_issuance").
+    workflow: str = Field(sa_column=Column(String, nullable=False, index=True))
+    # Opaque reference to the triggering entity (e.g. a bind_id or submission_id).
+    entity_ref: str = Field(sa_column=Column(String, nullable=False))
+    # Alert type string — per-monitor enum value (e.g. "BIND_STALE").
+    alert_type: str = Field(sa_column=Column(String, nullable=False, index=True))
+    # INFO | WARN | URGENT
+    severity: str = Field(sa_column=Column(String, nullable=False))
+    # Natural dedupe key: "{tenant_id}:{alert_type}:{entity_ref}:{as_of_day}"
+    dedupe_key: str = Field(sa_column=Column(String, nullable=False, unique=True))
+    # The triggering engine output — never a re-derived number (KB06).
+    payload: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=True))
+    created_at: datetime = Field(default_factory=_now, sa_column=_ts_col())
+    # Null until dismissed; setting resolved_at is the only mutation allowed.
+    resolved_at: datetime | None = Field(default=None, sa_column=_ts_col(nullable=True))
+    resolved_by: str | None = Field(default=None, sa_column=Column(String, nullable=True))
+
+
+# ── 14. PlatformSetting (Admin Panel — per-tenant override of an env tunable) ──
 class PlatformSetting(SQLModel, table=True):
     __tablename__ = "platform_setting"
     __table_args__ = (

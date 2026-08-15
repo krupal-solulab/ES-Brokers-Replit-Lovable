@@ -1,0 +1,52 @@
+CONTEXT
+`arq>=0.26` is installed but unused as a scheduler. Every workflow's "ongoing
+scheduled process" (Binder BI-04, Quote QC-07, Renewal FR-1) currently only runs
+when a user hits `/run`. `src/core/jobs/{service.py,worker.py}` exists and already
+defines an `ingest_and_extract` job — extend this module, do not create a parallel
+one.
+
+TASK
+Build ONE shared, reusable scheduled-job layer that every monitor plugs into.
+- Add an arq worker settings object with a `cron_jobs` list and a Redis settings
+  reader from env (`REDIS_URL`).
+- Add a `ScheduledMonitor` registry interface in `src/core/jobs/`: a monitor
+  registers a `name`, a `cadence` (cron expression, env-overridable per monitor),
+  and an async `run(session, as_of)` callable that returns a list of
+  `MonitorAlert` records.
+- Add a `MonitorAlert` persisted entity (see DATABASE) written append-only, and a
+  generic `GET /api/core/monitors/alerts` endpoint (tenant-scoped, RBAC-guarded,
+  filterable by `workflow` and `resolved`) plus `POST /alerts/{id}/dismiss`.
+- Each monitor's `run` MUST be idempotent per (entity_id, alert_type, as_of-day):
+  re-running the same day does not create duplicate alerts (dedupe on a natural
+  key), so the cron can run frequently without alert spam.
+- Preserve the existing `as_of` override parameter pattern already used in
+  binder_issuance/router.py for fixture/test determinism — the scheduler passes
+  real `date.today()`, tests pass a fixed `as_of`.
+
+DATABASE (new entity, matching existing audit/versioning conventions in KB05)
+MonitorAlert:
+  id, tenant_id, vertical, workflow (string), entity_ref (string, e.g. bind_id),
+  alert_type (string enum per monitor), severity (INFO|WARN|URGENT),
+  dedupe_key (unique per tenant+type+entity+as_of_day), payload (JSON, the
+  triggering engine output — never a re-derived number), created_at, resolved_at
+  (nullable), resolved_by (nullable). Append-only: resolution sets resolved_at,
+  never deletes.
+
+ENV VARS
+REDIS_URL, MONITOR_CRON_DEFAULT (default e.g. "0 */6 * * *"), plus a per-monitor
+override key convention `MONITOR_CRON_<NAME>`.
+
+EDGE CASES
+- Redis unavailable at startup: worker logs and retries with backoff, API stays
+  up (monitors degrade to on-demand `/run` only) — never crash the app.
+- A monitor's `run` raising must isolate to that monitor (one failing monitor
+  never blocks siblings) and write a job-error record via the existing
+  `core.jobs` error path.
+- Empty result set is a valid, logged run, not an error.
+
+ENDPOINTS
+GET  /api/core/monitors/alerts        -> {success, data: MonitorAlert[]}
+POST /api/core/monitors/alerts/{id}/dismiss -> {success, data: MonitorAlert}
+
+Screen(s) wired: none new yet — this is foundation. Existing per-workflow queues
+consume `MonitorAlert` rows in Prompts 3–6.

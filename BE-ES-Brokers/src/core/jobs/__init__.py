@@ -8,6 +8,14 @@ works even without Redis (the DB is the record of truth). ``WorkerSettings`` wir
 real Arq worker for production. See ``core.jobs.worker``.
 """
 
+from core.jobs.monitor import (
+    MonitorAlertIn,
+    ScheduledMonitor,
+    get_monitor_cadence,
+    get_monitors,
+    register_monitor,
+    run_scheduled_monitors,
+)
 from core.jobs.service import (
     JobRunService,
     JobStatus,
@@ -16,6 +24,14 @@ from core.jobs.service import (
 from core.jobs.worker import WorkerSettings
 
 __all__ = [
+    # Monitor registry
+    "MonitorAlertIn",
+    "ScheduledMonitor",
+    "get_monitor_cadence",
+    "get_monitors",
+    "register_monitor",
+    "run_scheduled_monitors",
+    # Job service
     "JobRunService",
     "JobStatus",
     "WorkerSettings",
