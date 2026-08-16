@@ -54,6 +54,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from core.common.dtos import Ctx
+from core.common.enums import ReviewStatus
 from core.jobs.monitor import (
     SEVERITY_INFO,
     SEVERITY_WARN,
@@ -131,7 +132,7 @@ async def _pending_suggestion_exists(
             select(ReviewItemRow).where(
                 col(ReviewItemRow.tenant_id) == tenant_id,
                 col(ReviewItemRow.workflow) == WORKFLOW_NAME,
-                col(ReviewItemRow.status) == "PENDING_REVIEW",
+                col(ReviewItemRow.status) == ReviewStatus.PENDING,
             )
         )
     ).scalars().all()
