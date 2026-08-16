@@ -22,8 +22,11 @@ from core.common.dtos import Ctx, WorkflowInput
 from core.common.enums import DecisionOutcome, ReviewStatus, Role, Vertical
 from core.config import get_settings
 from core.llm import build_llm_service
+from core.models import OutputPackage as OutputPackageRow
 from core.models import ReviewItem as ReviewItemRow
+from core.models import StateRetentionReference as StateRetentionReferenceRow
 from core.models import Tenant
+from verticals.es.workflows.diligent_search.compliance_engine import determine_state
 from verticals.es.workflows.diligent_search.router import (
     LiveDeclinationInput,
     LiveStateInput,
@@ -41,7 +44,8 @@ from verticals.es.workflows.market_matching.router import (
 )
 from verticals.es.workflows.market_matching.router import run_market_matching
 
-pytestmark = pytest.mark.skipif(
+# Applied individually — FR-8 unit tests run without TEST_DATA_ROOT.
+_needs_fixtures = pytest.mark.skipif(
     not get_settings().test_data_root,
     reason="TEST_DATA_ROOT not set; real Workflow_17 fixtures unavailable",
 )
@@ -92,6 +96,7 @@ async def _run(ctx: Ctx, scenario_ref: str):
     return await pipeline.run(ctx, WorkflowInput(source_ref=scenario_ref))
 
 
+@_needs_fixtures
 async def test_scenario_01_ready_sufficient_evidence(es_ctx) -> None:
     """3 of 3 required declinations on file, all written — a compliant
     document is generated, grounded only in the actual declination
@@ -109,6 +114,7 @@ async def test_scenario_01_ready_sufficient_evidence(es_ctx) -> None:
     assert len(state["declinations_on_file"]) == 3
 
 
+@_needs_fixtures
 async def test_scenario_02_exempt_explicitly_logged(es_ctx) -> None:
     """Export-list exemption must be its own distinct, explicitly-logged
     determination — never indistinguishable from "missing documentation"."""
@@ -124,6 +130,7 @@ async def test_scenario_02_exempt_explicitly_logged(es_ctx) -> None:
     assert state["generated_document_text"] is None
 
 
+@_needs_fixtures
 async def test_scenario_03_blocked_insufficient_evidence_no_document(es_ctx) -> None:
     """RELEASE GATE: only 2 of 3 declinations on file, one verbal-only.
     Must BLOCK and generate ZERO document text — a wrong affidavit here
@@ -142,6 +149,7 @@ async def test_scenario_03_blocked_insufficient_evidence_no_document(es_ctx) -> 
     assert "Admitted Carrier B" in state["gap_detail"]
 
 
+@_needs_fixtures
 async def test_scenario_04_partial_multistate_checklist(es_ctx) -> None:
     """8-state risk: TN/GA confirmed requiring standard diligent search
     (evidence not yet submitted), FL's hedged export-list note routes to
@@ -170,6 +178,7 @@ async def test_scenario_04_partial_multistate_checklist(es_ctx) -> None:
     assert all(not s["document_generated"] for s in states.values())
 
 
+@_needs_fixtures
 async def test_run_and_approve(es_ctx_senior, es_session) -> None:
     body = RunRequest(scenario_ref="scenario_01")
     item = await run_diligent_search(body, es_ctx_senior, es_session)
@@ -178,6 +187,7 @@ async def test_run_and_approve(es_ctx_senior, es_session) -> None:
     assert approved.status == ReviewStatus.APPROVED.value
 
 
+@_needs_fixtures
 async def test_escalate_pending_determination(es_ctx_senior, es_session) -> None:
     body = RunRequest(scenario_ref="scenario_04")
     item = await run_diligent_search(body, es_ctx_senior, es_session)
@@ -194,6 +204,7 @@ async def test_escalate_pending_determination(es_ctx_senior, es_session) -> None
 # the submission (fixture ref or a real live message id).
 
 
+@_needs_fixtures
 async def test_live_submissions_discovers_real_mm07_stub(
     es_ctx, es_session, mock_connectors_mode
 ) -> None:
@@ -205,6 +216,7 @@ async def test_live_submissions_discovers_real_mm07_stub(
     assert stubs[0].submission_id == "submission_06"
 
 
+@_needs_fixtures
 async def test_run_live_mixed_real_per_state_outcomes(
     es_ctx, es_session, mock_connectors_mode
 ) -> None:
@@ -267,6 +279,7 @@ async def test_run_live_mixed_real_per_state_outcomes(
     assert payload.overall_status == "BLOCKED"  # NY's confirmed gap takes priority
 
 
+@_needs_fixtures
 async def test_run_live_missing_required_count_never_defaults_to_zero(
     es_ctx, es_session, mock_connectors_mode
 ) -> None:
@@ -306,6 +319,7 @@ async def test_run_live_missing_required_count_never_defaults_to_zero(
     assert ca.generated_document_text is None
 
 
+@_needs_fixtures
 async def test_run_live_updates_same_item_not_duplicated(
     es_ctx, es_session, mock_connectors_mode
 ) -> None:
@@ -339,3 +353,214 @@ async def test_run_live_updates_same_item_not_duplicated(
     # A completed item no longer shows up as a pending stub.
     stubs_after = await list_live_submissions(es_ctx, es_session)
     assert stubs_after == []
+
+
+# ── FR-8 StateRetentionReference tests ───────────────────────────────────────
+#
+# Test 1: reference entry exists → retention fields populated, citation traced.
+# Test 2: no reference entry → null/pending, no regression from pre-change.
+# Test 3: multi-state → per-state independent lookup, zero sibling defaulting.
+# Test 4: reference absent entirely → all states null, structurally enforced.
+# Test 5: full router chain → DB rows → load_all() → payload end-to-end.
+#
+# Tests 1–3 and 5 use real Workflow_17 fixture scenarios (@_needs_fixtures).
+# Test 4 is a pure synchronous unit test on determine_state() — always runs.
+
+
+@_needs_fixtures
+async def test_fr8_retention_populated_when_reference_entry_exists(es_ctx) -> None:
+    """Test 1/4 — FR-8: when a StateRetentionReference entry exists for a state,
+    the pipeline writes retention_period_years and retention_source into the
+    payload, citing the supplied statutory reference exactly.
+
+    Scenario: scenario_01 (Oregon, SUFFICIENT).
+    Reference: Oregon → 7 years, "ORS § 742.001(a)".
+    """
+    pipeline = DiligentSearchPipeline(llm=build_llm_service())
+    output = await pipeline.run(
+        es_ctx,
+        WorkflowInput(source_ref="scenario_01"),
+        retention_reference={"Oregon": (7, "ORS § 742.001(a)")},
+    )
+
+    state = output.payload["state_determinations"][0]
+    assert state["state"] == "Oregon"
+    assert state["retention_period_years"] == 7, (
+        f"expected 7 from reference entry, got {state['retention_period_years']!r}"
+    )
+    assert state["retention_source"] == "ORS § 742.001(a)", (
+        f"source citation not propagated: {state['retention_source']!r}"
+    )
+
+
+@_needs_fixtures
+async def test_fr8_retention_null_when_no_reference_entry_no_regression(es_ctx) -> None:
+    """Test 2/4 — FR-8: identical scenario with no reference entry produces
+    retention_period_years=null — pre-change behavior preserved exactly.
+
+    This is the "never guess" regression gate: the absence of reference data
+    must never trigger a fabricated retention figure or a default.
+    """
+    pipeline = DiligentSearchPipeline(llm=build_llm_service())
+    output = await pipeline.run(
+        es_ctx,
+        WorkflowInput(source_ref="scenario_01"),
+        # Deliberately no retention_reference — mimics "DB has no rows"
+    )
+
+    state = output.payload["state_determinations"][0]
+    assert state["state"] == "Oregon"
+    assert state["retention_period_years"] is None, (
+        "no reference entry: retention_period_years must stay null (never guessed), "
+        f"got {state['retention_period_years']!r}"
+    )
+    assert state["retention_source"] is None, (
+        "no reference entry: retention_source must stay null, "
+        f"got {state['retention_source']!r}"
+    )
+
+
+@_needs_fixtures
+async def test_fr8_multistate_per_state_independent_never_inherits_sibling(es_ctx) -> None:
+    """Test 3/4 — FR-8 × FR-1/FR-6: multi-state risk uses a fully independent
+    lookup per state — a state with no reference entry stays null; it must
+    never inherit or default to a sibling state's retention figure.
+
+    Scenario: scenario_04 (8 states: TN, GA, FL, NC, SC, VA, AL, MS).
+    Reference supplied for TN (5 yr) and GA (7 yr) only.  All other six states
+    must remain null — each is an independent compliance question.
+    """
+    pipeline = DiligentSearchPipeline(llm=build_llm_service())
+    output = await pipeline.run(
+        es_ctx,
+        WorkflowInput(source_ref="scenario_04"),
+        retention_reference={
+            "TN": (5, "Tenn. Code Ann. § 56-2-117"),
+            "GA": (7, "O.C.G.A. § 33-7-4"),
+            # FL, NC, SC, VA, AL, MS deliberately absent from reference
+        },
+    )
+
+    states = {s["state"]: s for s in output.payload["state_determinations"]}
+    assert len(states) == 8, f"scenario_04 should have 8 states, got {list(states)}"
+
+    # TN and GA: populated from the reference entries
+    assert states["TN"]["retention_period_years"] == 5
+    assert states["TN"]["retention_source"] == "Tenn. Code Ann. § 56-2-117"
+    assert states["GA"]["retention_period_years"] == 7
+    assert states["GA"]["retention_source"] == "O.C.G.A. § 33-7-4"
+
+    # All six absent states: null — no sibling defaulting, no fallback
+    absent_states = ("FL", "NC", "SC", "VA", "AL", "MS")
+    for code in absent_states:
+        assert states[code]["retention_period_years"] is None, (
+            f"FR-1/FR-6 violation: {code} has no reference entry but "
+            f"retention_period_years={states[code]['retention_period_years']!r} "
+            "(must not inherit from TN/GA or default to any value)"
+        )
+        assert states[code]["retention_source"] is None, (
+            f"FR-1/FR-6 violation: {code} retention_source must be null "
+            f"when no reference entry exists, got {states[code]['retention_source']!r}"
+        )
+
+
+def test_fr8_reference_absent_all_null_structurally_enforced() -> None:
+    """Test 4/4 — FR-8: when the reference is absent entirely (None, empty
+    dict, or a dict with no matching state), determine_state() returns
+    retention_period_years=None and retention_source=None for every input —
+    the "never guess" invariant is structurally enforced at the engine level,
+    not a convention.
+
+    Pure synchronous unit test — no DB, no LLM, no TEST_DATA_ROOT needed.
+    Exercises the three forms of "absent reference" the engine can receive.
+    """
+    # Representative compliant state (SUFFICIENT) — retention should be null
+    # regardless of the underlying compliance outcome.
+    requirement = {"export_list_class": False, "admitted_declinations_required": 1}
+    declinations = [{"carrier": "Acme Admitted Co", "date": "2027-01-01", "written_evidence": True}]
+
+    absent_forms: list[dict | None] = [
+        None,                        # router passed nothing (empty DB)
+        {},                          # load_all() returned empty dict
+        {"OTHER": (3, "Other § 1")}, # non-matching state key
+    ]
+    for retention_ref in absent_forms:
+        det = determine_state("CA", requirement, declinations, retention_reference=retention_ref)
+        assert det.retention_period_years is None, (
+            f"With retention_reference={retention_ref!r}: "
+            f"expected None for CA (no matching entry), "
+            f"got {det.retention_period_years!r} — 'never guess' violated"
+        )
+        assert det.retention_source is None, (
+            f"With retention_reference={retention_ref!r}: "
+            f"retention_source must be None when no entry, "
+            f"got {det.retention_source!r}"
+        )
+
+    # Also verify that sufficiency logic is unaffected (no side effects from the lookup)
+    det_with_ref = determine_state(
+        "CA", requirement, declinations,
+        retention_reference={"CA": (7, "CAL. INS. CODE § 1764.2(a)")},
+    )
+    assert det_with_ref.retention_period_years == 7
+    assert det_with_ref.retention_source == "CAL. INS. CODE § 1764.2(a)"
+    assert det_with_ref.sufficiency_status == "SUFFICIENT"  # compliance logic unchanged
+
+
+@_needs_fixtures
+async def test_fr8_router_loads_retention_from_db_full_chain(
+    es_ctx, es_session
+) -> None:
+    """Test 5 — FR-8 integration: StateRetentionReference rows in the DB are
+    loaded by the router's load_all() call and flow through pipeline.run()
+    into the stored OutputPackage payload.
+
+    Proves the complete chain:
+      INSERT StateRetentionReference row
+      → router calls load_all(session)
+      → pipeline.run(retention_reference={...})
+      → determine_state() fills retention fields
+      → OutputPackageRow.payload contains the figure with correct citation.
+
+    No hardcoded knowledge anywhere in the chain — the figure originates
+    solely from the DB row inserted at the start of this test.
+    """
+    from uuid import uuid4
+
+    # Insert a reference row directly (simulates operator running the loader)
+    es_session.add(StateRetentionReferenceRow(
+        id=str(uuid4()),
+        state="Oregon",
+        retention_period_years=7,
+        source_citation="ORS § 742.001(a)",
+        loaded_from="test_fr8_integration.json",
+    ))
+    await es_session.commit()
+
+    # Call the router endpoint — it picks up retention_reference from load_all()
+    item = await run_diligent_search(
+        RunRequest(scenario_ref="scenario_01"), es_ctx, es_session
+    )
+
+    # Retrieve the stored output package to inspect the persisted payload
+    review = (
+        await es_session.execute(
+            select(ReviewItemRow).where(col(ReviewItemRow.id) == item.id)
+        )
+    ).scalar_one()
+    pkg = (
+        await es_session.execute(
+            select(OutputPackageRow).where(
+                col(OutputPackageRow.id) == review.output_package_id
+            )
+        )
+    ).scalar_one()
+
+    state = pkg.payload["state_determinations"][0]
+    assert state["state"] == "Oregon"
+    assert state["retention_period_years"] == 7, (
+        f"router did not load retention from DB: got {state['retention_period_years']!r}"
+    )
+    assert state["retention_source"] == "ORS § 742.001(a)", (
+        f"source citation not carried through: {state['retention_source']!r}"
+    )
