@@ -51,3 +51,16 @@ export async function dismissMonitorAlert(alertId: string): Promise<MonitorAlert
   );
   return res.data;
 }
+
+/** Dev-only: manually trigger one scheduled monitor for a given date.
+ *  Returns the MonitorAlert rows produced (or already produced for that date).
+ *  Endpoint returns 404 in production. SENIOR/ADMIN only. */
+export async function runMonitor(
+  name: string,
+  asOf: string,
+): Promise<MonitorAlert[]> {
+  const res = await api.post<{ success: boolean; data: MonitorAlert[]; created: boolean }>(
+    `/api/core/monitors/${encodeURIComponent(name)}/run?as_of=${encodeURIComponent(asOf)}`,
+  );
+  return res.data ?? [];
+}

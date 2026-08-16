@@ -13,6 +13,7 @@ VITE_API_BASE_URL = ""
 VITE_DEMO_ROLE = "junior"
 VITE_DEMO_TENANT_ID = "demo-es"
 VITE_DEMO_USER_ID = "demo-es-junior"
+CONNECTORS_MODE = "live"
 
 [workflows]
 runButton = "Project"

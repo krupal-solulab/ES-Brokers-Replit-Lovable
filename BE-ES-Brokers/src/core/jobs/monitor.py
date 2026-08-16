@@ -110,6 +110,11 @@ def get_monitors() -> list[ScheduledMonitor]:
     return list(_registry.values())
 
 
+def get_monitor(name: str) -> ScheduledMonitor | None:
+    """Return a single registered monitor by name, or None if unknown."""
+    return _registry.get(name)
+
+
 # ── Cron expression helper ────────────────────────────────────────────────────
 
 def _cron_to_arq_kwargs(expr: str) -> dict[str, Any]:

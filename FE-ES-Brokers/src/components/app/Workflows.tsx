@@ -60,7 +60,8 @@ import {
   type DiscrepancyResolution,
   type PolicyDiscrepancyResolution,
 } from "@/lib/api/binderIssuance";
-import { listMonitorAlerts, dismissMonitorAlert, type MonitorAlert } from "@/lib/api/monitorAlerts";
+import { listMonitorAlerts, dismissMonitorAlert, runMonitor, type MonitorAlert } from "@/lib/api/monitorAlerts";
+import { getIdentity } from "@/lib/api/identity";
 import {
   attachLiveIssuedEndorsement,
   CHANGE_TYPES,
@@ -151,11 +152,107 @@ import {
   Clock,
   Package,
   Mail,
+  FlaskConical,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { simulateRequest } from "@/lib/simulate";
 import { PageHeader } from "./AppShell";
 import type { ReactNode } from "react";
+
+/* ============================================================
+   Dev-only: manual monitor trigger (senior + non-prod only)
+   ============================================================ */
+
+const _IS_NON_PROD = import.meta.env.MODE !== "production";
+
+function RunMonitorButton({
+  monitors,
+}: {
+  monitors: Array<{ name: string; label: string }>;
+}) {
+  const role = getIdentity()?.role;
+  if (!_IS_NON_PROD || (role !== "SENIOR" && role !== "ADMIN")) return null;
+
+  const [open, setOpen] = useState(false);
+  const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10));
+  const [results, setResults] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState<string | null>(null);
+
+  async function fire(monitorName: string) {
+    setLoading(monitorName);
+    setResults((r) => ({ ...r, [monitorName]: "" }));
+    try {
+      const alerts = await runMonitor(monitorName, asOf);
+      setResults((r) => ({
+        ...r,
+        [monitorName]: alerts.length === 0 ? "0 alerts (nothing triggered)" : `${alerts.length} alert(s) returned`,
+      }));
+    } catch (e) {
+      setResults((r) => ({
+        ...r,
+        [monitorName]: e instanceof Error ? e.message : "Error",
+      }));
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-lg border border-dashed border-amber-300 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-700/50 p-3 text-sm">
+      <button
+        className="flex w-full items-center gap-2 font-medium text-amber-700 dark:text-amber-400"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+        <span>Run monitor (test)</span>
+        {open ? (
+          <ChevronUp className="ml-auto h-3.5 w-3.5" />
+        ) : (
+          <ChevronDown className="ml-auto h-3.5 w-3.5" />
+        )}
+      </button>
+      {open && (
+        <div className="mt-3 flex flex-col gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="w-12 shrink-0 text-xs text-muted-foreground">as_of</span>
+            <input
+              type="date"
+              value={asOf}
+              onChange={(e) => setAsOf(e.target.value)}
+              className="rounded border border-border bg-background px-2 py-1 text-xs"
+            />
+          </div>
+          {monitors.map(({ name, label }) => (
+            <div key={name} className="flex items-center gap-2.5">
+              <button
+                className="rounded bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-50 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-800/60"
+                onClick={() => fire(name)}
+                disabled={loading === name || !asOf}
+              >
+                {loading === name ? "Running…" : label}
+              </button>
+              {results[name] && (
+                <span
+                  className={`text-xs ${
+                    results[name].toLowerCase().includes("error") ||
+                    results[name].startsWith("4") ||
+                    results[name].startsWith("5")
+                      ? "text-destructive"
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }`}
+                >
+                  {results[name]}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ============================================================
    Reusable primitives shared across every workflow
@@ -2652,6 +2749,10 @@ export function QuoteComparison({ search = {} }: { search?: Record<string, unkno
         }
       />
 
+      <RunMonitorButton
+        monitors={[{ name: "quote_validity_window", label: "quote_validity_window" }]}
+      />
+
       <div className="mb-5">
         <ProcessAnim
           steps={[
@@ -3272,6 +3373,13 @@ export function BinderIssuance() {
         eyebrow="Workflow 05 · Live"
         title="Binder & Policy Issuance Coordination"
         description="From selected quote to bound policy — subjectivity clearance, carrier bind confirmation, and issued-policy reconciliation, all checked against what was actually agreed, never assumed."
+      />
+
+      <RunMonitorButton
+        monitors={[
+          { name: "binder_issuance_timeline", label: "binder_issuance_timeline" },
+          { name: "binder_ongoing_obligations", label: "binder_ongoing_obligations" },
+        ]}
       />
 
       {listQuery.isLoading && (
@@ -4611,6 +4719,10 @@ export function RenewalRemarketing() {
             Check live renewal
           </Button>
         }
+      />
+
+      <RunMonitorButton
+        monitors={[{ name: "renewal_trigger", label: "renewal_trigger" }]}
       />
 
       {liveBindsOpen && (
@@ -6055,6 +6167,10 @@ export function CarrierAppetiteIntelligence() {
             Check live signals
           </Button>
         }
+      />
+
+      <RunMonitorButton
+        monitors={[{ name: "carrier_appetite_batch", label: "carrier_appetite_batch" }]}
       />
 
       <div className="mb-5 flex items-start gap-3 rounded-xl border border-border bg-secondary/40 p-4 text-sm">
