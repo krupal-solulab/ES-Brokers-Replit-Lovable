@@ -31,7 +31,7 @@ from core.submissions import ensure_submission
 from verticals.es.decision_core import (
     SUBMISSION_VALIDATION_KEY,
     decide_market_match,
-    load_carrier_panel,
+    load_carrier_panel_db,
     seed_and_publish_carrier_rulesets,
     seed_and_publish_submission_validation_ruleset,
 )
@@ -106,7 +106,9 @@ class MarketMatchingPipeline:
                 rule_results=validation_results,
             )
 
-        panel = load_carrier_panel(self._workflow_n)
+        # DB-first: returns store rows for this tenant; falls back to JSON panel
+        # when the store is empty (load_carrier_panel_db handles both paths).
+        panel = await load_carrier_panel_db(self._session, ctx.tenant_id, self._workflow_n)
         await seed_and_publish_carrier_rulesets(self._session, ctx, panel)
         decision = await decide_market_match(self._session, ctx, self._rules_engine, panel, data)
         return decision.model_copy(update={"rule_results": validation_results})

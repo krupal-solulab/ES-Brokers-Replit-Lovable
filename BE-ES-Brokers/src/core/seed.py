@@ -39,6 +39,11 @@ from core.auth.password import hash_password  # noqa: E402
 from core.common.enums import Role, Vertical  # noqa: E402
 from core.db import async_session_factory  # noqa: E402
 from core.models import Tenant, User  # noqa: E402
+from verticals.es.carrier_profile_store import CarrierProfileService  # noqa: E402
+from verticals.es.decision_core.carrier_profiles import load_carrier_panel  # noqa: E402
+
+# Workflow_10 (Market Matching) panel — n=10, files resolved via bundled-path fallback.
+_CARRIER_WORKFLOW_N = 10
 
 # Dev-only credential for every seeded admin account — not a secret, this is
 # a local SQLite dev database. An admin-managed "change password" action
@@ -102,6 +107,25 @@ async def seed() -> None:
             else:
                 print(f"= user '{email}' already exists, skipping")
         await session.commit()
+
+        # ── Carrier appetite profiles (Workflow_10 / Market Matching panel) ───
+        # Idempotent: seed_from_json skips carriers that already have a row.
+        profiles = load_carrier_panel(_CARRIER_WORKFLOW_N)
+        if not profiles:
+            print("! carrier profiles: bundled JSON not found — skipping carrier seed")
+        else:
+            for tenant_id, _name, _vertical in _TENANTS:
+                seeded_rows = await CarrierProfileService.seed_from_json(
+                    session, tenant_id, profiles
+                )
+                if seeded_rows:
+                    names = ", ".join(r.carrier_name for r in seeded_rows)
+                    print(
+                        f"+ seeded {len(seeded_rows)} carrier profile(s) for '{tenant_id}': {names}"
+                    )
+                else:
+                    print(f"= carrier profiles for '{tenant_id}' already seeded, skipping")
+
     print("Seed complete.")
 
 

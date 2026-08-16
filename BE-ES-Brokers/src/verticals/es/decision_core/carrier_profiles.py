@@ -16,6 +16,15 @@ from core.config import get_settings
 
 log = logging.getLogger(__name__)
 
+# Carrier-profile JSON files shipped with the repo — used when TEST_DATA_ROOT
+# is absent (dev after a DB reset, CI without fixture mounts, etc.).
+# Path: <repo_root>/Data sets/Workflow 1/market_matching_dataset/carrier_profiles/
+# __file__ = src/verticals/es/decision_core/carrier_profiles.py  → parents[4] = repo root
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_BUNDLED_CARRIER_DIR = (
+    _REPO_ROOT / "Data sets" / "Workflow 1" / "market_matching_dataset" / "carrier_profiles"
+)
+
 
 @dataclass(frozen=True)
 class SeverityCeiling:
@@ -96,15 +105,43 @@ def _to_profile(raw: dict[str, object]) -> CarrierProfile:
     )
 
 
-def load_carrier_panel(n: int) -> list[CarrierProfile]:
-    """Load every ``carrier_profiles/*.json`` for ``Workflow_<n>``. Missing path/folder
-    -> ``[]`` (warned), matching the shared loader's never-crash convention."""
+def _locate_carrier_panel_dir(n: int) -> Path | None:
+    """Return the carrier_profiles/ directory to load from.
+
+    Priority:
+    1. ``TEST_DATA_ROOT/Workflow_{n}/test_dataset/carrier_profiles/``
+    2. Repo-bundled ``Data sets/Workflow 1/market_matching_dataset/carrier_profiles/``
+       (always present in the repo; no env var needed).
+
+    Returns ``None`` (with a warning) only when neither path exists.
+    """
     dataset = _dataset_dir(n)
-    if dataset is None:
-        return []
-    panel_dir = dataset / "carrier_profiles"
-    if not panel_dir.is_dir():
-        log.warning("No carrier_profiles/ folder in %s.", dataset)
+    if dataset is not None:
+        p = dataset / "carrier_profiles"
+        if p.is_dir():
+            return p
+        log.warning("No carrier_profiles/ folder in %s; trying bundled path.", dataset)
+    # Bundled fallback — repo-relative, no TEST_DATA_ROOT required.
+    if _BUNDLED_CARRIER_DIR.is_dir():
+        log.info("Using bundled carrier profiles at %s.", _BUNDLED_CARRIER_DIR)
+        return _BUNDLED_CARRIER_DIR
+    log.warning(
+        "No carrier profiles found for Workflow_%d (TEST_DATA_ROOT=%s, bundled path missing).",
+        n,
+        get_settings().test_data_root or "unset",
+    )
+    return None
+
+
+def load_carrier_panel(n: int) -> list[CarrierProfile]:
+    """Load every ``carrier_profiles/*.json`` for ``Workflow_<n>``.
+
+    Missing path/folder -> ``[]`` (warned), matching the shared loader's
+    never-crash convention.  Falls back to the repo-bundled profiles when
+    ``TEST_DATA_ROOT`` is not set (dev after DB reset, CI without mounts).
+    """
+    panel_dir = _locate_carrier_panel_dir(n)
+    if panel_dir is None:
         return []
 
     profiles: list[CarrierProfile] = []
@@ -116,7 +153,7 @@ def load_carrier_panel(n: int) -> list[CarrierProfile]:
             continue
         profiles.append(_to_profile(raw))
 
-    log.info("Loaded %d carrier profiles for Workflow_%d.", len(profiles), n)
+    log.info("Loaded %d carrier profiles for Workflow_%d from %s.", len(profiles), n, panel_dir)
     return profiles
 
 
