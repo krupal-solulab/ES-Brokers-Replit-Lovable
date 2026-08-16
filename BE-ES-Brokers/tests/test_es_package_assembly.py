@@ -44,15 +44,25 @@ from verticals.es.workflows.package_assembly.live_ingestion import (
     build_live_extracted_model,
 )
 from verticals.es.workflows.package_assembly.router import (
+    EditBodyIn,
     RunFromMarketMatchingRequest,
+    edit as edit_cover_letter,
     run_package_assembly_from_market_matching,
 )
 from verticals.es.workflows.package_assembly.service import PackageAssemblyPipeline
 
-pytestmark = pytest.mark.skipif(
+# Applied individually to tests that load Workflow_10/11 fixture files.
+# Edit-endpoint tests create DB rows directly and always run.
+_needs_fixtures = pytest.mark.skipif(
     not get_settings().test_data_root,
     reason="TEST_DATA_ROOT not set; real Workflow_10/11 fixtures unavailable",
 )
+
+# ── edit-distance test constants ─────────────────────────────────────────────
+_PA_ORIGINAL_BODY = "Please find the documents attached."
+_PA_CHANGED_BODY  = "Please find the documents enclosed."
+_PA_DIST_CHANGED  = 6 / 35   # raw=6, max_len=35, normalized≈0.1714
+_PA_DIST_IDENTICAL = 0.0
 
 
 @pytest.fixture
@@ -83,6 +93,7 @@ async def _run(ctx: Ctx, scenario_ref: str, carrier_id: str | None = None):
     return await pipeline.run(ctx, WorkflowInput(source_ref=scenario_ref, params=params))
 
 
+@_needs_fixtures
 async def test_scenario_01_disclosed_gap_not_blocking(es_ctx) -> None:
     """Vantage: a third-party-only actuarial summary is missing — disclosed
     (READY_WITH_GAP), never treated as a blocker."""
@@ -94,6 +105,7 @@ async def test_scenario_01_disclosed_gap_not_blocking(es_ctx) -> None:
     assert any("actuarial" in g.lower() for g in gap_items)
 
 
+@_needs_fixtures
 async def test_scenario_02_blocked_two_reasons(es_ctx) -> None:
     """Palmetto: loss-run shortfall + an unanswerable narrative questionnaire
     — both block; the package must never be presented as ready."""
@@ -106,6 +118,7 @@ async def test_scenario_02_blocked_two_reasons(es_ctx) -> None:
     assert any("questionnaire" in b.lower() for b in blocking)
 
 
+@_needs_fixtures
 async def test_scenario_03_same_submission_different_carrier_outcomes(es_ctx) -> None:
     """The core per-carrier-independence test: the SAME loss-run data is a
     non-issue for Ironclad (3yr requirement, met) and a blocker for Meridian
@@ -128,6 +141,7 @@ async def test_scenario_03_same_submission_different_carrier_outcomes(es_ctx) ->
     assert "loss run" not in ironclad_text.lower()
 
 
+@_needs_fixtures
 async def test_scenario_04_auto_fill_boundary_release_gate(es_ctx) -> None:
     """MANDATORY release-gate case (PRD Section 9): resist the plausible
     shortcut of estimating unit_count from TIV/class even though the
@@ -168,6 +182,7 @@ async def test_scenario_04_auto_fill_boundary_release_gate(es_ctx) -> None:
     assert unit_count["source_citation"] is None
 
 
+@_needs_fixtures
 async def test_scenario_05_proactive_disclosure_and_diligent_search_passthrough(es_ctx) -> None:
     """Summit Roofing -> Ironclad: diligent-search is a verbatim pass-through
     from the input (documentation_status='present'), never recomputed."""
@@ -177,6 +192,7 @@ async def test_scenario_05_proactive_disclosure_and_diligent_search_passthrough(
     assert output.payload["blocking_items"] == []
 
 
+@_needs_fixtures
 async def test_scenario_06_clean_baseline(es_ctx) -> None:
     output = await _run(es_ctx, "scenario_06")
     assert output.decision.outcome is DecisionOutcome.PROCEED
@@ -185,6 +201,7 @@ async def test_scenario_06_clean_baseline(es_ctx) -> None:
     assert output.payload["gap_items_disclosed"] == []
 
 
+@_needs_fixtures
 async def test_full_pipeline_review_queue_and_audit(es_ctx, es_session) -> None:
     """package() -> review_queue.enqueue() -> act() -> audit, end to end,
     for one real scenario."""
@@ -210,6 +227,7 @@ async def test_full_pipeline_review_queue_and_audit(es_ctx, es_session) -> None:
     assert len(entries) == 1
 
 
+@_needs_fixtures
 async def test_run_from_market_matching_uses_real_carrier_and_document_data(
     es_ctx, es_session
 ) -> None:
@@ -256,6 +274,7 @@ async def test_run_from_market_matching_uses_real_carrier_and_document_data(
     assert any("Diligent search" in b.item for b in payload.blocking_items)
 
 
+@_needs_fixtures
 async def test_run_from_market_matching_reflects_real_diligent_search_record(
     es_ctx, es_session
 ) -> None:
@@ -310,6 +329,7 @@ async def test_run_from_market_matching_reflects_real_diligent_search_record(
     assert payload.diligent_search_attached is True
 
 
+@_needs_fixtures
 async def test_run_live_cover_letter_is_grounded_in_real_data(es_ctx, es_session) -> None:
     """Part 4 fix: the live path's cover letter must be grounded in this
     submission's REAL named insured, REAL carrier appetite notes, and REAL
@@ -399,3 +419,159 @@ async def test_document_availability_uses_content_classification_not_filename(
         es_session, es_ctx, mm_item.id, "CAR-03", extracted_model=model
     )
     assert "loss_run" in view["documents_available_from_extraction"]
+
+
+# ── FR-20/FR-21 edit-endpoint tests (no TEST_DATA_ROOT, no LLM) ──────────────
+
+async def _pa_item_pair(session, ctx: Ctx, *, sub_id: str, body: str):
+    """Persist an OutputPackageRow + ReviewItemRow for the cover-letter edit tests.
+
+    The payload shape mirrors what PackageAssemblyPipeline.package() writes so
+    the edit endpoint finds ``payload["cover_letter"]["body"]`` correctly.
+    """
+    pkg = OutputPackageRow(
+        tenant_id=ctx.tenant_id,
+        submission_id=sub_id,
+        workflow="package_assembly",
+        payload={
+            "package_id": f"PKG-{sub_id}",
+            "submission_id": sub_id,
+            "carrier_id": "CAR-TEST",
+            "carrier_name": "Test Carrier Co",
+            "status": "READY",
+            "cover_letter": {
+                "body": body,
+                "citations": [],
+            },
+        },
+    )
+    session.add(pkg)
+    await session.flush()
+    item = ReviewItemRow(
+        tenant_id=ctx.tenant_id,
+        submission_id=sub_id,
+        output_package_id=pkg.id,
+        workflow="package_assembly",
+        status=ReviewStatus.PENDING,
+    )
+    session.add(item)
+    await session.commit()
+    return pkg, item
+
+
+async def test_pa_edit_changed_body_writes_nonzero_distance_and_audit(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-20/FR-21: a cover-letter body that differs from the original writes
+    cover_letter.edit_distance_from_original in (0, 1] and appends an
+    "action=edit" audit entry.  No LLM — endpoint created directly from DB rows.
+
+    Changed body: "...attached." → "...enclosed."
+    raw = 6, max_len = 35, normalized = 6/35 ≈ 0.1714.
+    """
+    pkg, item = await _pa_item_pair(
+        es_session, es_ctx, sub_id="SUB-EDIT-PA-CHANGED", body=_PA_ORIGINAL_BODY
+    )
+
+    result = await edit_cover_letter(
+        item.id, EditBodyIn(edited_body=_PA_CHANGED_BODY), es_ctx, es_session
+    )
+
+    # Status unchanged — edit is audit-only
+    assert result.id == item.id
+    assert result.status == ReviewStatus.PENDING.value
+
+    # Distance stored in cover_letter sub-dict
+    await es_session.refresh(pkg)
+    dist = pkg.payload["cover_letter"]["edit_distance_from_original"]
+    assert isinstance(dist, float), f"expected float, got {type(dist)}"
+    assert 0.0 < dist <= 1.0, f"distance {dist} not in (0, 1]"
+    assert dist == pytest.approx(_PA_DIST_CHANGED, rel=1e-9), (
+        f"expected {_PA_DIST_CHANGED}, got {dist}"
+    )
+
+    # Audit row
+    entries = await DefaultAuditService().query(
+        es_session, es_ctx, {"workflow": "package_assembly"}
+    )
+    edited = [e for e in entries if e.what == "action=edit"]
+    assert len(edited) == 1, f"expected 1 'action=edit' audit entry, got {len(edited)}"
+    assert edited[0].detail["edit_distance_normalized"] == pytest.approx(
+        _PA_DIST_CHANGED, rel=1e-9
+    )
+    assert edited[0].detail["edit_distance_raw"] == 6
+
+
+async def test_pa_edit_identical_body_writes_zero_distance(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-20/FR-21: re-submitting the unchanged cover letter produces 0.0 and
+    still writes an audit entry."""
+    pkg, item = await _pa_item_pair(
+        es_session, es_ctx, sub_id="SUB-EDIT-PA-IDENTICAL", body=_PA_ORIGINAL_BODY
+    )
+
+    await edit_cover_letter(
+        item.id, EditBodyIn(edited_body=_PA_ORIGINAL_BODY), es_ctx, es_session
+    )
+
+    await es_session.refresh(pkg)
+    dist = pkg.payload["cover_letter"]["edit_distance_from_original"]
+    assert dist == _PA_DIST_IDENTICAL, (
+        f"identical cover letter must produce distance 0.0, got {dist}"
+    )
+
+    entries = await DefaultAuditService().query(
+        es_session, es_ctx, {"workflow": "package_assembly"}
+    )
+    assert any(e.what == "action=edit" for e in entries), (
+        "audit row must be written even for identical body"
+    )
+
+
+async def test_pa_edit_empty_body_rejected_with_422(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-20/FR-21: empty edited_body rejected with 422; original cover letter
+    not overwritten."""
+    from fastapi import HTTPException as _HTTPException
+    pkg, item = await _pa_item_pair(
+        es_session, es_ctx, sub_id="SUB-EDIT-PA-EMPTY", body=_PA_ORIGINAL_BODY
+    )
+
+    with pytest.raises(_HTTPException) as exc_info:
+        await edit_cover_letter(
+            item.id, EditBodyIn(edited_body=""), es_ctx, es_session
+        )
+    assert exc_info.value.status_code == 422, (
+        f"expected 422 for empty body, got {exc_info.value.status_code}"
+    )
+
+    await es_session.refresh(pkg)
+    assert "edit_distance_from_original" not in (
+        pkg.payload.get("cover_letter") or {}
+    ), "edit_distance_from_original must not appear after a rejected empty body"
+
+
+async def test_pa_edit_requires_no_llm_call(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-20/FR-21: the cover-letter edit path is pure Levenshtein — no LLM.
+
+    Structurally proven: no LLM object is created in this test, and the
+    endpoint function has no LLM parameter.  The call succeeds solely from
+    the stored cover_letter.body and the submitted text.
+    """
+    pkg, item = await _pa_item_pair(
+        es_session, es_ctx, sub_id="SUB-EDIT-PA-NOLLM", body=_PA_ORIGINAL_BODY
+    )
+
+    result = await edit_cover_letter(
+        item.id, EditBodyIn(edited_body=_PA_CHANGED_BODY), es_ctx, es_session
+    )
+    assert result.id == item.id
+
+    await es_session.refresh(pkg)
+    assert pkg.payload["cover_letter"].get("edit_distance_from_original") is not None, (
+        "edit_distance_from_original must be written without any LLM"
+    )

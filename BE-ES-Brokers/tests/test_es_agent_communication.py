@@ -33,9 +33,11 @@ from core.models import Tenant
 from core.review_queue import DefaultReviewQueueService
 from verticals.es.agent_communication_hooks import fire_package_assembly_result
 from verticals.es.workflows.agent_communication.router import (
+    EditBodyIn,
     RunRequest,
     approve,
     compliance_clear,
+    edit as edit_agent_comm,
     run_agent_communication,
 )
 from verticals.es.workflows.agent_communication.service import (
@@ -44,10 +46,20 @@ from verticals.es.workflows.agent_communication.service import (
 )
 from verticals.es.workflows.agent_communication.trigger_loader import load_trigger
 
-pytestmark = pytest.mark.skipif(
+# Applied individually to tests that load Workflow_12 fixture files.
+# Edit-endpoint tests create DB rows directly and always run.
+_needs_fixtures = pytest.mark.skipif(
     not get_settings().test_data_root,
     reason="TEST_DATA_ROOT not set; real Workflow_12 fixtures unavailable",
 )
+
+# ── edit-distance test constants ─────────────────────────────────────────────
+# Same text, one-word swap: "attached" → "enclosed" (6 character edits, same length).
+# raw = 6, max_len = 35, normalized = 6/35 ≈ 0.1714 (verified via edit_distance.py).
+_ORIGINAL_BODY = "Please find the documents attached."
+_CHANGED_BODY  = "Please find the documents enclosed."
+_DIST_CHANGED  = 6 / 35      # 0.171428…
+_DIST_IDENTICAL = 0.0
 
 
 @pytest.fixture
@@ -85,6 +97,7 @@ async def _run(session: AsyncSession, ctx: Ctx, trigger_data: dict):
     return await pipeline.run(ctx, inp)
 
 
+@_needs_fixtures
 async def test_trigger_01_submission_acknowledgment_combines_both_carriers(
     es_ctx, es_session
 ) -> None:
@@ -99,6 +112,7 @@ async def test_trigger_01_submission_acknowledgment_combines_both_carriers(
     assert "Meridian Excess & Surplus" in output.draft.text
 
 
+@_needs_fixtures
 async def test_trigger_02_missing_info_scoped_to_carrier(es_ctx, es_session) -> None:
     """Must scope the ask to Palmetto specifically (FR-1's carrier-specific
     scoping requirement, extending Package Assembly's PA-01 per-carrier
@@ -111,6 +125,7 @@ async def test_trigger_02_missing_info_scoped_to_carrier(es_ctx, es_session) -> 
     assert "Supplemental contractor questionnaire not provided" in output.draft.text
 
 
+@_needs_fixtures
 async def test_trigger_03_no_market_found_compliance_gated_no_carrier_names(
     es_ctx, es_session
 ) -> None:
@@ -127,6 +142,7 @@ async def test_trigger_03_no_market_found_compliance_gated_no_carrier_names(
         assert carrier not in output.draft.text
 
 
+@_needs_fixtures
 async def test_trigger_04_placement_confirmation_clean(es_ctx, es_session) -> None:
     output = await _run(es_session, es_ctx, _trigger("trigger_04"))
     assert output.payload["trigger_type"] == "PLACEMENT_CONFIRMATION"
@@ -135,6 +151,7 @@ async def test_trigger_04_placement_confirmation_clean(es_ctx, es_session) -> No
     assert "$81,500" in output.draft.text
 
 
+@_needs_fixtures
 async def test_trigger_05_no_response_followup_fallback_subject(es_ctx, es_session) -> None:
     """No prior draft exists in this fresh session's history — must fall back
     to a deterministic 'Re: ...' reconstruction rather than error out."""
@@ -145,6 +162,7 @@ async def test_trigger_05_no_response_followup_fallback_subject(es_ctx, es_sessi
     assert "36" in output.draft.text  # days_remaining_in_window
 
 
+@_needs_fixtures
 async def test_trigger_05_no_response_followup_reuses_original_thread_subject(
     es_ctx, es_session
 ) -> None:
@@ -160,6 +178,7 @@ async def test_trigger_05_no_response_followup_reuses_original_thread_subject(
     assert followup.payload["subject_line"] == expected_subject
 
 
+@_needs_fixtures
 async def test_trigger_06_quote_terms_summary_price_justification(es_ctx, es_session) -> None:
     """RA-TN-08: the hardest pricing case — price must be connected to the
     specific loss-history cause, never presented bare."""
@@ -171,6 +190,7 @@ async def test_trigger_06_quote_terms_summary_price_justification(es_ctx, es_ses
     assert "180,000" in output.draft.text  # the specific reserved claim driving price
 
 
+@_needs_fixtures
 async def test_fr5_no_duplicate_draft_for_unresolved_trigger(es_ctx, es_session) -> None:
     first = await run_agent_communication(
         RunRequest(trigger=_trigger("trigger_01")), es_ctx, es_session
@@ -184,6 +204,7 @@ async def test_fr5_no_duplicate_draft_for_unresolved_trigger(es_ctx, es_session)
     assert second.id == first.id
 
 
+@_needs_fixtures
 async def test_fr12_max_one_followup_per_original_request(es_ctx, es_session) -> None:
     first = await run_agent_communication(
         RunRequest(trigger=_trigger("trigger_05")), es_ctx, es_session
@@ -197,6 +218,7 @@ async def test_fr12_max_one_followup_per_original_request(es_ctx, es_session) ->
     assert exc_info.value.status_code == 409
 
 
+@_needs_fixtures
 async def test_compliance_gate_blocks_approve_until_cleared(
     es_ctx, es_ctx_senior, es_session
 ) -> None:
@@ -220,6 +242,7 @@ async def test_compliance_gate_blocks_approve_until_cleared(
     assert approved.status == ReviewStatus.APPROVED.value
 
 
+@_needs_fixtures
 async def test_full_pipeline_review_queue_and_audit(es_ctx, es_session) -> None:
     """package() -> review_queue.enqueue() -> act() -> audit, end to end, for
     one clean trigger."""
@@ -315,3 +338,170 @@ async def test_fire_package_assembly_result_never_fabricates_named_insured(
     payload = await _agent_comm_payload_for_submission(es_session, es_ctx, "SUB-AGENT-COMM-NO-DOCS")
     assert payload is not None
     assert payload["named_insured"] is None
+
+
+# ── FR-17/FR-21 edit-endpoint tests (no TEST_DATA_ROOT, no LLM) ──────────────
+
+def _make_ac_item(
+    session, ctx: Ctx, *, sub_id: str, body: str
+) -> tuple[OutputPackageRow, ReviewItemRow]:
+    """Helper: persist an OutputPackageRow + ReviewItemRow for the edit tests.
+
+    Creates the DB rows synchronously (caller must flush/commit).  The
+    package payload mimics the shape the agent-communication service
+    produces so the edit endpoint finds ``payload["body"]`` correctly.
+    """
+    from sqlalchemy import inspect  # local import — avoids top-level noise
+    pkg = OutputPackageRow(
+        tenant_id=ctx.tenant_id,
+        submission_id=sub_id,
+        workflow="agent_communication",
+        payload={
+            "body": body,
+            "subject": "RE: Placement update",
+            "to": "carrier@example.com",
+            "status": "pending",
+        },
+    )
+    session.add(pkg)
+    # Flush so pkg.id is populated without a full commit
+    return pkg
+
+
+async def _ac_item_pair(session, ctx: Ctx, *, sub_id: str, body: str):
+    """Flush, then create the ReviewItemRow with the real pkg.id."""
+    pkg = _make_ac_item(session, ctx, sub_id=sub_id, body=body)
+    await session.flush()
+    item = ReviewItemRow(
+        tenant_id=ctx.tenant_id,
+        submission_id=sub_id,
+        output_package_id=pkg.id,
+        workflow="agent_communication",
+        status=ReviewStatus.PENDING,
+    )
+    session.add(item)
+    await session.commit()
+    return pkg, item
+
+
+async def test_edit_changed_body_writes_nonzero_distance_and_audit(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-17/FR-21: submitting a body that differs from the draft writes
+    edit_distance_from_original in (0, 1] into the payload, persists it, and
+    appends an "edited" audit entry.  No LLM call — verified by creating the
+    OutputPackageRow directly (no pipeline) and calling the endpoint directly.
+    The endpoint has no LLM parameter at all.
+
+    Changed body: "...attached." → "...enclosed."
+    raw edit distance = 6, max_len = 35, normalized = 6/35 ≈ 0.1714.
+    """
+    pkg, item = await _ac_item_pair(
+        es_session, es_ctx, sub_id="SUB-EDIT-AC-CHANGED", body=_ORIGINAL_BODY
+    )
+
+    result = await edit_agent_comm(
+        item.id, EditBodyIn(edited_body=_CHANGED_BODY), es_ctx, es_session
+    )
+
+    # Status unchanged (edit is audit-only)
+    assert result.id == item.id
+    assert result.status == ReviewStatus.PENDING.value
+
+    # Payload persisted with distance
+    await es_session.refresh(pkg)
+    dist = pkg.payload["edit_distance_from_original"]
+    assert isinstance(dist, float), f"expected float, got {type(dist)}"
+    assert 0.0 < dist <= 1.0, f"distance {dist} not in (0, 1]"
+    assert dist == pytest.approx(_DIST_CHANGED, rel=1e-9), (
+        f"expected {_DIST_CHANGED}, got {dist}"
+    )
+
+    # Audit row written
+    entries = await DefaultAuditService().query(
+        es_session, es_ctx, {"workflow": "agent_communication"}
+    )
+    edited = [e for e in entries if e.what == "edited"]
+    assert len(edited) == 1, f"expected 1 'edited' audit entry, got {len(edited)}"
+    assert edited[0].detail["edit_distance_normalized"] == pytest.approx(
+        _DIST_CHANGED, rel=1e-9
+    )
+    assert edited[0].detail["edit_distance_raw"] == 6
+
+
+async def test_edit_identical_body_writes_zero_distance(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-17/FR-21: re-submitting the unchanged draft produces distance 0.0,
+    still writes an audit entry (the broker viewed the draft), and does NOT
+    overwrite the payload with a nonzero figure."""
+    pkg, item = await _ac_item_pair(
+        es_session, es_ctx, sub_id="SUB-EDIT-AC-IDENTICAL", body=_ORIGINAL_BODY
+    )
+
+    await edit_agent_comm(
+        item.id, EditBodyIn(edited_body=_ORIGINAL_BODY), es_ctx, es_session
+    )
+
+    await es_session.refresh(pkg)
+    dist = pkg.payload["edit_distance_from_original"]
+    assert dist == _DIST_IDENTICAL, (
+        f"identical body must produce distance 0.0, got {dist}"
+    )
+
+    entries = await DefaultAuditService().query(
+        es_session, es_ctx, {"workflow": "agent_communication"}
+    )
+    assert any(e.what == "edited" for e in entries), "audit row must always be written"
+
+
+async def test_edit_empty_body_rejected_with_422(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-17/FR-21: an empty edited_body is rejected with HTTP 422 — a blank
+    textarea submitted before the user types is a client bug and must not
+    overwrite an existing distance or the original draft body."""
+    pkg, item = await _ac_item_pair(
+        es_session, es_ctx, sub_id="SUB-EDIT-AC-EMPTY", body=_ORIGINAL_BODY
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await edit_agent_comm(
+            item.id, EditBodyIn(edited_body="   "), es_ctx, es_session
+        )
+    assert exc_info.value.status_code == 422, (
+        f"expected 422 for empty body, got {exc_info.value.status_code}"
+    )
+
+    # Original payload untouched — distance not written
+    await es_session.refresh(pkg)
+    assert "edit_distance_from_original" not in pkg.payload, (
+        "edit_distance_from_original must not be written for a rejected empty body"
+    )
+
+
+async def test_edit_requires_no_llm_call(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-17/FR-21: the edit path is pure string metric — no LLM is involved.
+
+    Proven structurally: no LLM object is created anywhere in this test, and
+    the endpoint itself has no LLM parameter.  The function executes
+    successfully (distance computed, payload updated, audit written) purely
+    from the stored draft text and the submitted edited text.
+    """
+    # No build_llm_service(), no MockLLMProvider, no API key — intentional
+    pkg, item = await _ac_item_pair(
+        es_session, es_ctx, sub_id="SUB-EDIT-AC-NOLLM", body=_ORIGINAL_BODY
+    )
+
+    # Call succeeds without any LLM object
+    result = await edit_agent_comm(
+        item.id, EditBodyIn(edited_body=_CHANGED_BODY), es_ctx, es_session
+    )
+    assert result.id == item.id
+
+    await es_session.refresh(pkg)
+    assert pkg.payload.get("edit_distance_from_original") is not None, (
+        "edit_distance_from_original must be set without any LLM"
+    )
