@@ -10,22 +10,30 @@ Scenario 03 is the release-gate proof for this workflow: a logging gap
 must never be silently interpolated or omitted. Scenario 02 proves a
 low-volume carrier figure is never ranked/presented as equally reliable.
 Scenario 04 proves a $0-savings confirmation never reads as a failure.
+
+FR-4 delay exclusion (test_fr4_*) and FR-6 revenue attribution
+(test_fr6_*) tests use synthetic in-memory DB data only — no
+TEST_DATA_ROOT required. The _needs_fixtures marker gates only the
+Workflow_19-fixture-based scenario tests.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 
 import core.models  # noqa: F401  (registers tables)
+from core.admin.settings_override import clear_override, set_override
 from core.common.dtos import Ctx, WorkflowInput
 from core.common.enums import DecisionOutcome, Role, Vertical
 from core.config import get_settings
 from core.llm import build_llm_service
 from core.models import OutputPackage as OutputPackageRow
+from core.models import PipelineStageEvent as StageEventRow
 from core.models import Tenant
 from verticals.es.workflows.pipeline_reporting.router import (
     RunRequest,
@@ -34,7 +42,10 @@ from verticals.es.workflows.pipeline_reporting.router import (
 )
 from verticals.es.workflows.pipeline_reporting.service import PipelineReportingPipeline
 
-pytestmark = pytest.mark.skipif(
+# Applied individually to tests that need Workflow_19 fixture files.
+# Live-path tests (es_session + synthetic rows) do NOT carry this mark
+# and always run.
+_needs_fixtures = pytest.mark.skipif(
     not get_settings().test_data_root,
     reason="TEST_DATA_ROOT not set; real Workflow_19 fixtures unavailable",
 )
@@ -67,6 +78,7 @@ async def _run(ctx: Ctx, scenario_ref: str):
     return await pipeline.run(ctx, WorkflowInput(source_ref=scenario_ref))
 
 
+@_needs_fixtures
 async def test_scenario_01_clean_funnel_baseline(es_ctx) -> None:
     output = await _run(es_ctx, "scenario_01")
     payload = output.payload
@@ -81,6 +93,7 @@ async def test_scenario_01_clean_funnel_baseline(es_ctx) -> None:
     assert payload["overall_conversion_pct"] == 56.0
 
 
+@_needs_fixtures
 async def test_scenario_02_low_volume_carrier_annotated_and_ordered(es_ctx) -> None:
     output = await _run(es_ctx, "scenario_02")
     payload = output.payload
@@ -97,6 +110,7 @@ async def test_scenario_02_low_volume_carrier_annotated_and_ordered(es_ctx) -> N
     assert vantage["low_volume_flag"] is True
 
 
+@_needs_fixtures
 async def test_scenario_03_data_gap_never_interpolated(es_ctx) -> None:
     """RELEASE GATE: the gapped stage's own figure AND the following
     stage's percentage must both be explicitly withheld — never
@@ -119,6 +133,7 @@ async def test_scenario_03_data_gap_never_interpolated(es_ctx) -> None:
     assert payload["overall_conversion_pct"] is None
 
 
+@_needs_fixtures
 async def test_scenario_04_confirmation_value_not_a_failure(es_ctx) -> None:
     output = await _run(es_ctx, "scenario_04")
     payload = output.payload
@@ -133,6 +148,7 @@ async def test_scenario_04_confirmation_value_not_a_failure(es_ctx) -> None:
     assert clearpath["savings_amount"] is None
 
 
+@_needs_fixtures
 async def test_run_endpoint(es_ctx, es_session) -> None:
     body = RunRequest(scenario_ref="scenario_01")
     item = await run_pipeline_reporting(body, es_ctx, es_session)
@@ -296,3 +312,377 @@ async def test_run_live_time_to_placement_is_raw_elapsed_days(es_ctx, es_session
     assert placement.submissions_bound == 1
     assert placement.avg_days == 14.0
     assert placement.delay_excluded is False  # honest — FR-4's exclusion is not computed
+
+
+# ── FR-4 delay exclusion ─────────────────────────────────────────────────────
+
+async def test_fr4_delay_excluded_carrier_attributed_vs_raw(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-4: two submissions in one batch run:
+
+    Case A (SUB-D1 / Ironclad):
+        raw_elapsed = 21 days
+        BLOCKED span attributed BROKER = 7 days  (days 4–11 of the window)
+        carrier_attributed = 21 − 7 = 14 days
+
+    Case B (SUB-D2 / Vantage):
+        raw_elapsed = 10 days
+        NO BLOCKED span recorded
+        carrier_attributed = 10 days  (identical to raw; zero broker delay)
+
+    Because stage_events exist (for SUB-D1), ``time_to_placement_carrier_attributed``
+    is populated for BOTH carriers and ``delay_excluded=True`` on the raw
+    TimeToPlacementOut rows as well (the signal "a carrier-attributed figure
+    is available alongside this raw number").
+    """
+    matched_at = datetime(2027, 5, 1, 8, 0, tzinfo=UTC)
+    # Case A
+    bound_d1 = matched_at + timedelta(days=21)
+    blocked_enter = matched_at + timedelta(days=4)
+    blocked_exit = matched_at + timedelta(days=11)   # 7 broker days
+    # Case B
+    bound_d2 = matched_at + timedelta(days=10)
+
+    rows = [
+        # Market Matching — both submissions matched
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-D1",
+            workflow="market_matching", created_at=matched_at,
+            payload={
+                "submission_id": "SUB-D1",
+                "matches": [{"carrier_id": "CAR-IC", "carrier_name": "Ironclad", "score": 88.0}],
+                "excluded": [],
+                "diligent_search": {"required": False, "on_file": 0, "compliant": True, "note": "n/a"},
+            },
+        ),
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-D2",
+            workflow="market_matching", created_at=matched_at,
+            payload={
+                "submission_id": "SUB-D2",
+                "matches": [{"carrier_id": "CAR-VT", "carrier_name": "Vantage", "score": 72.0}],
+                "excluded": [],
+                "diligent_search": {"required": False, "on_file": 0, "compliant": True, "note": "n/a"},
+            },
+        ),
+        # Binder Issuance — both bound
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-D1",
+            workflow="binder_issuance", created_at=bound_d1,
+            payload={
+                "bind_id": "BIND-D1", "submission_id": "SUB-D1",
+                "carrier_id": "CAR-IC", "carrier_name": "Ironclad",
+                "requested_bind_terms": {},
+                "carrier_confirmation": {"binder_number": "BINDER-D1"},
+            },
+        ),
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-D2",
+            workflow="binder_issuance", created_at=bound_d2,
+            payload={
+                "bind_id": "BIND-D2", "submission_id": "SUB-D2",
+                "carrier_id": "CAR-VT", "carrier_name": "Vantage",
+                "requested_bind_terms": {},
+                "carrier_confirmation": {"binder_number": "BINDER-D2"},
+            },
+        ),
+    ]
+    # BLOCKED span for SUB-D1 only — broker was assembling docs for 7 days
+    stage_event = StageEventRow(
+        id=str(uuid4()),
+        tenant_id=es_ctx.tenant_id,
+        submission_ref="SUB-D1",
+        stage="package_assembly_blocked",
+        entered_at=blocked_enter,
+        exited_at=blocked_exit,
+        attribution="BROKER",
+    )
+    es_session.add_all(rows)
+    es_session.add(stage_event)
+    await es_session.commit()
+
+    item = await run_pipeline_reporting_live(es_ctx, es_session)
+    payload = item.payload
+
+    # ── carrier-attributed section present (stage events exist) ──────────────
+    ca = {p.carrier_name: p for p in payload.time_to_placement_carrier_attributed}
+    assert "Ironclad" in ca, "Ironclad must appear in carrier-attributed section"
+    assert "Vantage" in ca, "Vantage must appear in carrier-attributed section"
+
+    ic = ca["Ironclad"]
+    vt = ca["Vantage"]
+
+    # Case A: 7 broker days subtracted
+    assert ic.avg_days_raw == 21.0, f"Ironclad raw should be 21, got {ic.avg_days_raw}"
+    assert ic.avg_days_carrier_attributed == 14.0, (
+        f"Ironclad carrier_attributed should be 14 (21−7), got {ic.avg_days_carrier_attributed}"
+    )
+
+    # Case B: no BLOCKED span — carrier_attributed identical to raw
+    assert vt.avg_days_raw == 10.0, f"Vantage raw should be 10, got {vt.avg_days_raw}"
+    assert vt.avg_days_carrier_attributed == 10.0, (
+        f"Vantage carrier_attributed should equal raw (10) when no span recorded, "
+        f"got {vt.avg_days_carrier_attributed}"
+    )
+
+    # ── raw section still present; delay_excluded=True signals CA is available ─
+    raw = {p.carrier_name: p for p in payload.time_to_placement}
+    assert raw["Ironclad"].avg_days == 21.0
+    assert raw["Vantage"].avg_days == 10.0
+    assert raw["Ironclad"].delay_excluded is True, "delay_excluded must be True when CA data present"
+    assert raw["Vantage"].delay_excluded is True
+
+
+async def test_fr4_open_blocked_span_never_subtracted(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-4 / KB06: an open BLOCKED span (exited_at is None) is never subtracted
+    — subtracting an unknown duration would fabricate a figure. The raw elapsed
+    time is returned unchanged as the carrier-attributed figure."""
+    matched_at = datetime(2027, 5, 15, 8, 0, tzinfo=UTC)
+    bound_at = matched_at + timedelta(days=14)
+
+    rows = [
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-O1",
+            workflow="market_matching", created_at=matched_at,
+            payload={
+                "submission_id": "SUB-O1",
+                "matches": [{"carrier_id": "CAR-IC", "carrier_name": "Ironclad", "score": 80.0}],
+                "excluded": [],
+                "diligent_search": {"required": False, "on_file": 0, "compliant": True, "note": "n/a"},
+            },
+        ),
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-O1",
+            workflow="binder_issuance", created_at=bound_at,
+            payload={
+                "bind_id": "BIND-O1", "submission_id": "SUB-O1",
+                "carrier_id": "CAR-IC", "carrier_name": "Ironclad",
+                "requested_bind_terms": {},
+                "carrier_confirmation": {"binder_number": "BINDER-O1"},
+            },
+        ),
+    ]
+    # Open span — exited_at is None (submission still BLOCKED right now)
+    open_span = StageEventRow(
+        id=str(uuid4()),
+        tenant_id=es_ctx.tenant_id,
+        submission_ref="SUB-O1",
+        stage="package_assembly_blocked",
+        entered_at=matched_at + timedelta(days=2),
+        exited_at=None,   # open — must NOT be subtracted
+        attribution="BROKER",
+    )
+    es_session.add_all(rows)
+    es_session.add(open_span)
+    await es_session.commit()
+
+    item = await run_pipeline_reporting_live(es_ctx, es_session)
+    payload = item.payload
+
+    ca = {p.carrier_name: p for p in payload.time_to_placement_carrier_attributed}
+    assert "Ironclad" in ca
+    ic = ca["Ironclad"]
+    # open span contributes zero — attributed must equal raw
+    assert ic.avg_days_raw == 14.0
+    assert ic.avg_days_carrier_attributed == 14.0, (
+        f"Open span must not be subtracted; expected 14.0, got {ic.avg_days_carrier_attributed}"
+    )
+
+
+# ── FR-6 revenue attribution ─────────────────────────────────────────────────
+
+async def test_fr6_revenue_with_commission_config(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-6: with commission config present, revenue == bound_premium × rate.
+    Every figure carries provisional=True; not_configured=False."""
+    bound_at = datetime(2027, 6, 1, 12, 0, tzinfo=UTC)
+    matched_at = bound_at - timedelta(days=14)
+
+    rows = [
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-R1",
+            workflow="market_matching", created_at=matched_at,
+            payload={
+                "submission_id": "SUB-R1",
+                "matches": [{"carrier_id": "CAR-IC", "carrier_name": "Ironclad", "score": 85.0}],
+                "excluded": [],
+                "diligent_search": {"required": False, "on_file": 0, "compliant": True, "note": "n/a"},
+            },
+        ),
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-R1",
+            workflow="binder_issuance", created_at=bound_at,
+            payload={
+                "bind_id": "BIND-R1", "submission_id": "SUB-R1",
+                "carrier_id": "CAR-IC", "carrier_name": "Ironclad",
+                "requested_bind_terms": {},
+                "carrier_confirmation": {
+                    "binder_number": "BINDER-R1",
+                    "confirmed_terms": {"premium": 50000},
+                },
+            },
+        ),
+    ]
+    es_session.add_all(rows)
+    await es_session.commit()
+
+    # Inject per-tenant commission config (12 % for Ironclad)
+    set_override(es_ctx.tenant_id, "commission_rates_json", '{"Ironclad": 0.12}')
+    try:
+        item = await run_pipeline_reporting_live(es_ctx, es_session)
+    finally:
+        clear_override(es_ctx.tenant_id, "commission_rates_json")
+
+    payload = item.payload
+
+    assert len(payload.revenue_attribution) == 1, (
+        f"Expected 1 revenue entry, got {len(payload.revenue_attribution)}"
+    )
+    rev = payload.revenue_attribution[0]
+    assert rev.carrier_name == "Ironclad"
+    assert rev.submissions_bound == 1
+    assert rev.bound_premium_total == 50000.0
+    assert rev.commission_rate == 0.12
+    # revenue == Σ(bound_premium × rate) = 50 000 × 0.12 = 6 000
+    assert rev.estimated_commission == 6000.0, (
+        f"Expected estimated_commission=6000.0, got {rev.estimated_commission}"
+    )
+    assert rev.not_configured is False
+    assert rev.provisional is True, "Every revenue figure must carry provisional=True"
+
+
+async def test_fr6_revenue_no_commission_config_shows_not_configured(
+    es_ctx: Ctx, es_session: AsyncSession,
+) -> None:
+    """FR-6 / KB06: without a commission config the tile shows 'not_configured'
+    and NEVER emits a guessed figure. The report still generates (no crash,
+    no empty payload)."""
+    bound_at = datetime(2027, 6, 1, 12, 0, tzinfo=UTC)
+    matched_at = bound_at - timedelta(days=14)
+
+    rows = [
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-NC1",
+            workflow="market_matching", created_at=matched_at,
+            payload={
+                "submission_id": "SUB-NC1",
+                "matches": [{"carrier_id": "CAR-IC", "carrier_name": "Ironclad", "score": 85.0}],
+                "excluded": [],
+                "diligent_search": {"required": False, "on_file": 0, "compliant": True, "note": "n/a"},
+            },
+        ),
+        OutputPackageRow(
+            tenant_id=es_ctx.tenant_id, submission_id="SUB-NC1",
+            workflow="binder_issuance", created_at=bound_at,
+            payload={
+                "bind_id": "BIND-NC1", "submission_id": "SUB-NC1",
+                "carrier_id": "CAR-IC", "carrier_name": "Ironclad",
+                "requested_bind_terms": {},
+                "carrier_confirmation": {
+                    "binder_number": "BINDER-NC1",
+                    "confirmed_terms": {"premium": 50000},
+                },
+            },
+        ),
+    ]
+    es_session.add_all(rows)
+    await es_session.commit()
+
+    # No commission config — default commission_rates_json is "{}" (empty)
+    # Ensure no leftover override from another test contaminates this run
+    clear_override(es_ctx.tenant_id, "commission_rates_json")
+
+    item = await run_pipeline_reporting_live(es_ctx, es_session)
+    payload = item.payload
+
+    # Report must still generate
+    assert payload is not None
+
+    # Revenue entry still present (carrier has bound submissions), but no figure
+    assert len(payload.revenue_attribution) == 1, (
+        f"Expected 1 revenue entry even without config; got {len(payload.revenue_attribution)}"
+    )
+    rev = payload.revenue_attribution[0]
+    assert rev.not_configured is True, "Carrier without rate must show not_configured=True"
+    assert rev.estimated_commission is None, (
+        f"No commission figure must be emitted; got {rev.estimated_commission}"
+    )
+    # provisional remains True — the absence of a figure is itself a proviso
+    assert rev.provisional is True
+
+
+# ── No-regression: Scenario 04 + Scenario 03 with new-metric assertions ──────
+
+@_needs_fixtures
+async def test_scenario_04_no_regression_new_metrics_absent(es_ctx: Ctx) -> None:
+    """No-regression: Scenario 04 ($0-savings / confirmation_value) still
+    distinguishes savings_identified from confirmation_value, AND the new
+    FR-4 / FR-6 fields are explicitly empty (the remarketing fixture has no
+    stage events and no bound-premium data — they must never be interpolated
+    or guessed from remarketing rows alone)."""
+    output = await _run(es_ctx, "scenario_04")
+    payload = output.payload
+
+    # ── original assertions still hold ───────────────────────────────────────
+    outcomes = {o["account"]: o for o in payload["remarketing_value"]}
+
+    summit = outcomes["Summit Roofing Group"]
+    assert summit["outcome_type"] == "confirmation_value"
+    assert summit["savings_amount"] is None
+
+    clearpath = outcomes["Clearpath Bookkeeping (prior 2 cycles)"]
+    assert clearpath["outcome_type"] == "not_remarketed"
+    assert clearpath["savings_amount"] is None
+
+    # ── new FR-4 / FR-6 metrics: absent, not interpolated ────────────────────
+    # Remarketing fixture has no placements or stage events — the carrier-
+    # attributed section must be empty, never fabricated from remarket rows.
+    assert payload["time_to_placement_carrier_attributed"] == [], (
+        "FR-4 carrier-attributed section must be empty for a remarketing fixture "
+        "(no stage events, no bound submissions recorded in this scenario)"
+    )
+    # No commission config was supplied and no bound premiums exist in the
+    # remarketing fixture — revenue_attribution must be empty, not guessed.
+    assert payload["revenue_attribution"] == [], (
+        "FR-6 revenue_attribution must be empty for a remarketing fixture "
+        "(no carrier_confirmation rows with premiums)"
+    )
+
+
+@_needs_fixtures
+async def test_scenario_03_fr2_gap_new_metrics_not_interpolated(es_ctx: Ctx) -> None:
+    """FR-2 gap period: the gap is displayed; the new FR-4 and FR-6 metrics are
+    NOT interpolated across the gap period.
+
+    Scenario 03 is a funnel report with a logging gap in 'Compared & Selected'.
+    The fixture carries no stage_events and no bound_submissions with premiums,
+    so the carrier-attributed and revenue sections must be empty — never
+    synthesised from funnel row counts (which would be fabrication)."""
+    output = await _run(es_ctx, "scenario_03")
+    payload = output.payload
+
+    # ── gap still displayed ───────────────────────────────────────────────────
+    assert payload["data_completeness"]["status"] == "PARTIAL"
+    gaps = payload["data_completeness"]["gaps"]
+    assert any(g["stage"] == "Compared & Selected" for g in gaps), (
+        "Gap must still be surfaced after FR-4 / FR-6 code added"
+    )
+    stages = {s["stage"]: s for s in payload["funnel"]}
+    assert stages["Compared & Selected"]["count"] is None
+    assert stages["Compared & Selected"]["pct_of_prior_stage"] is None
+
+    # ── new metrics NOT interpolated ──────────────────────────────────────────
+    # The gap in Compared & Selected must not be smoothed into the new sections.
+    # carrier_attributed relies on PipelineStageEvent rows that don't exist in
+    # the fixture — it must be empty, not estimated from funnel deltas.
+    assert payload["time_to_placement_carrier_attributed"] == [], (
+        "Carrier-attributed timing must not be interpolated across a data-gap period"
+    )
+    # No bound premiums in the funnel fixture — revenue must not be fabricated.
+    assert payload["revenue_attribution"] == [], (
+        "Revenue attribution must not be guessed from a partial-funnel scenario"
+    )
