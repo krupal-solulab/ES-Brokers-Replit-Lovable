@@ -43,7 +43,14 @@ SOURCE_CI = "CI_METADATA_REFRESH"
 class MetadataRefreshDTO(BaseModel):
     """Structural gate for CI-03 (FR-4): only confidence + last_updated may be
     supplied. The typed DTO makes it structurally impossible to touch
-    class_codes_accepted / _excluded / premium_band / severity_ceiling."""
+    class_codes_accepted / _excluded / premium_band / severity_ceiling.
+
+    ``extra="forbid"`` ensures any attempt to construct the DTO with additional
+    fields — even accidentally — raises a ValidationError at the call site.
+    This is a defence-in-depth complement to the type-level two-field limit.
+    """
+
+    model_config = {"extra": "forbid"}
 
     appetite_confidence: str  # high | medium | low
     appetite_last_updated: str  # ISO date string
