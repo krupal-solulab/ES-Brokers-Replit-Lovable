@@ -1,0 +1,37 @@
+CONTEXT
+Prompt 1 added shared arq scheduler infra + a MonitorAlert store; Prompts 3–6
+registered five monitors. Validate they FIRE on schedule, are idempotent, and are
+failure-isolated. Reuse the test_jobs_async.py fakeredis+skip pattern.
+
+TASK — add tests/test_es_monitors.py and run it. Assert each below with a fixed
+`as_of` (never real today()):
+
+1. binder_issuance_timeline (BI-04): using Binder Workflow_14 Scenario 05
+   (Clearpath → Apex, policy docs overdue vs the carrier's stated issuance
+   timeline), running the monitor emits exactly ONE MonitorAlert, severity URGENT,
+   workflow=binder_issuance. Running it AGAIN same `as_of` emits NO new alert
+   (idempotent on dedupe_key). Scenario 01 (clean bind, docs on time) emits NONE.
+2. binder_ongoing_obligations (BI-07/FR-17): Scenario 04 (Summit Roofing, loss-
+   control report due in 60 days) emits a reminder alert at the configured
+   interval (e.g. 15 and 5 days prior) and NOT before; it never sets the bind to
+   BLOCKED.
+3. quote_validity_window (QC-07): Quote Workflow_13 Scenario 06 (Continental
+   Freight single expiring quote) with no logged broker action emits an URGENT
+   validity alert; the same quote WITH a logged broker action emits none.
+4. renewal_trigger (FR-1/19): Renewal Workflow_16 Scenario 04 (Delta Electric,
+   incumbent non-response 25 days out) produces an URGENT_REMARKET review + URGENT
+   alert; Scenario 01 (Continental Freight, flat) produces NO_REMARKET and no
+   urgent alert. Re-running the same cycle does not create a duplicate review.
+5. carrier_appetite_batch (CI FR-1): runs the existing consistency engine per
+   carrier/class on schedule (asserted in V4 below for its outputs).
+6. Failure isolation: force one monitor's run() to raise; assert the others still
+   complete and a job-error row is written (no app crash).
+7. Redis-down: assert the API still serves and monitors degrade to on-demand only.
+
+VERIFY IN UI
+Binder LiveBinderCard shows the overdue/obligation alerts in its status area;
+Quote queue shows the single-quote urgency item distinctly; Renewal queue shows
+URGENT_REMARKET distinctly.
+
+REPORT: pass count for test_es_monitors.py + confirmation of idempotency and
+isolation assertions.
