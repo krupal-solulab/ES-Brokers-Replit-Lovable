@@ -1,0 +1,25 @@
+EXPECTED COORDINATION OUTPUT — Continental Freight Carriers
+
+Pre-bind subjectivity status (per BI-02):
+  [x] Primary carrier binding confirmed - CLEARED (08/20/2027)
+  [x] Signed application - CLEARED
+  No blocking items remained at time of bind request - bind order was
+  eligible to be sent.
+
+Bind order sent to carrier: matches broker_bind_instruction exactly
+  (premium $335,000, limits, effective date 09/01/2027)
+
+Carrier confirmation reconciliation (per BI-03):
+  Binder Number: VEP-2027-88104
+  Premium: $335,000 — MATCHES requested
+  Limits: MATCHES requested
+  Effective Date: 09/01/2027 — MATCHES requested
+  STATUS: CLEAN CONFIRMATION, no discrepancy
+
+Policy issuance tracking (per BI-04): initiated, expected within 30-45
+days per carrier's stated timeline (by ~10/04/2027). No action needed
+yet - this is a monitoring entry, not a task for the broker right now.
+
+DOWNSTREAM TRIGGER: fires Retail Agent Communication's Placement
+Confirmation draft immediately upon this clean bind confirmation (per
+BI-06 / cross-workflow integration).

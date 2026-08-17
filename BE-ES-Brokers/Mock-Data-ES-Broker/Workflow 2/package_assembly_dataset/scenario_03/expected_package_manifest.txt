@@ -1,0 +1,36 @@
+EXPECTED PACKAGE MANIFEST — Delta Electric Services -> TWO CARRIERS SIMULTANEOUSLY
+
+This scenario tests that the system produces genuinely DIFFERENT
+packages from the SAME underlying submission data, per PA-01/PA-05 -
+not a single generic package sent to two carriers.
+
+--- PACKAGE 1: Ironclad Casualty Solutions ---
+STATUS: READY TO SEND
+  [x] ACORD 125, ACORD 126, 3-year loss run, current financials
+  All requirements met - no blocking items.
+
+Draft Cover Letter tone: Straightforward, confident - no need to
+proactively address the loss run length since Ironclad's own
+requirement is only 3 years. Cover letter should NOT apologize for or
+draw attention to loss history length here, since doing so would be
+introducing a non-issue.
+
+--- PACKAGE 2: Meridian Excess & Surplus ---
+STATUS: BLOCKED
+  [x] ACORD 125, ACORD 126, current financials
+  [ ] Loss run: only 3 of 5 required years provided
+
+Draft Cover Letter tone: If broker proceeds despite the gap (their
+choice), the letter should proactively acknowledge the shortfall exactly
+as in Scenario 02 - the same underlying loss run limitation gets
+DIFFERENT treatment in the two packages because it matters to one
+carrier's stated requirements and not the other's. This is the core
+thing this scenario is built to test: the same fact should not be
+flagged uniformly across every package - it should be evaluated against
+EACH carrier's own specific requirements independently.
+
+CRITICAL TEST: a naive implementation might generate one cover letter
+template and reuse it for both carriers with minor swaps. The correct
+behavior is that the loss-run-length concern appears ONLY in the
+Meridian package, not the Ironclad one, because it is only a real gap
+relative to Meridian's stated requirement.

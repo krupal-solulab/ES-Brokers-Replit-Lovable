@@ -1,0 +1,19 @@
+{
+  "bind_id": "BIND-6602",
+  "named_insured": "Oakwood Apartment Homes LP",
+  "carrier_id": "CAR-04",
+  "carrier_name": "Coastal Mutual Specialty",
+  "current_terms": {
+    "premium": 81500,
+    "limits": "Property $18,000,000 blanket; GL $1,000,000/$2,000,000",
+    "effective_date": "2027-08-15",
+    "expiration_date": "2028-08-15"
+  },
+  "requested_change": {
+    "type": "add_location",
+    "detail": "Add Willowbrook Commons, 180-unit apartment complex, requested effective 10/01/2027",
+    "new_location_estimated_tiv": 12500000
+  },
+  "policy_term_days_total": 366,
+  "days_elapsed_at_requested_effective_date": 47
+}

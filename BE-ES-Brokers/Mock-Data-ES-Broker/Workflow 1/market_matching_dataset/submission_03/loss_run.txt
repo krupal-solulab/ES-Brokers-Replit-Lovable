@@ -1,0 +1,13 @@
+LOSS RUN REPORT
+Named Insured: Clearpath Bookkeeping Services LLC
+Policy Period Covered: 08/01/2024 - 08/01/2027 (3 years)
+
+Claim 1
+  Date of Loss: 01/09/2026
+  Cause of Loss: E&O-adjacent GL claim - client dispute over data handling,
+    settled as GL matter
+  Status: Closed
+  Incurred: $9,200
+
+Summary:
+  Total Incurred (3yr): $9,200

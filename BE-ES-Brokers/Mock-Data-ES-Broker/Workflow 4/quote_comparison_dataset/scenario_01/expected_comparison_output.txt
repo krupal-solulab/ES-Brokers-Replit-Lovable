@@ -1,0 +1,31 @@
+EXPECTED COMPARISON OUTPUT — Delta Electric Services
+
+Comparability: DIRECTLY COMPARABLE — both quotes use identical limits
+($1M/$2M) and deductible ($2,500), so premium is a valid primary
+comparison point.
+
+| | Ironclad | Meridian |
+|---|---|---|
+| Premium | $26,500 | $24,900 |
+| Limits | $1M/$2M | $1M/$2M |
+| Deductible | $2,500 | $2,500 |
+| Subjectivities | Signed app, no material ops change | Signed app, REMAINING 2 YEARS LOSS RUN, no material ops change |
+| Quote valid through | 08/25/2027 | 08/20/2027 |
+
+RECOMMENDATION: Present Meridian as primary option (lower premium by
+$1,600/~6%), but flag clearly that Meridian's quote is CONTINGENT on
+the outstanding loss run years that were already requested from the
+retail agent (per Trigger 02 in the Retail Agent Communication
+dataset) — this is not yet a clean bindable quote the way Ironclad's
+is. Ironclad should be presented as the "ready now" option and Meridian
+as "better price, pending one open item."
+
+Meridian's quote validity window (08/20) is also 5 days SHORTER than
+Ironclad's (08/25) — worth flagging as a timing consideration if the
+loss run doesn't come in promptly, since the better-priced option could
+lapse first.
+
+MODE: Single primary recommendation (Meridian) WITH a clear secondary
+option (Ironclad) explicitly presented as the fallback if the
+subjectivity isn't cleared in time — not a flat "Meridian wins," since
+its price advantage is conditional.

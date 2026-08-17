@@ -1,0 +1,14 @@
+{
+  "bind_id": "BIND-6603",
+  "named_insured": "Delta Electric Services LLC",
+  "incumbent_carrier_id": "CAR-03",
+  "incumbent_carrier_name": "Ironclad Casualty Solutions",
+  "expiring_terms": {"premium": 26500, "limits": "General Liability $1,000,000/$2,000,000", "effective_date": "2027-09-01"},
+  "expiring_term_loss_activity": "No new claims",
+  "exposure_change": {"revenue_prior": 5650000, "revenue_current": 5800000, "pct_change": 2.7},
+  "incumbent_renewal_offer": {
+    "received": false,
+    "days_before_expiration_at_check": 25,
+    "note": "No renewal terms received; two follow-up inquiries sent to Ironclad's renewal desk (per broker log) with no substantive response, only auto-acknowledgment"
+  }
+}

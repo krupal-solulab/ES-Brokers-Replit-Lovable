@@ -1,0 +1,10 @@
+STATEMENT OF VALUES (SOV)
+Named Insured: Oakwood Apartment Homes LP
+Location 1: 4500 Oakwood Trail, Mobile, AL 36609
+  Building Value: $16,500,000
+  Contents Value: $400,000
+  Business Income (12mo): $1,100,000
+  Total Insurable Value: $18,000,000
+  Year Built: 2010
+  Construction: Masonry/Steel Frame
+  Sprinklered: Yes

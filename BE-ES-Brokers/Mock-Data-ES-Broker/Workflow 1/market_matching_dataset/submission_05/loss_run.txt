@@ -1,0 +1,20 @@
+LOSS RUN REPORT
+Named Insured: Summit Roofing Group LLC
+Policy Period Covered: 08/01/2022 - 08/01/2027 (5 years)
+
+Claim 1
+  Date of Loss: 04/2023
+  Cause of Loss: Bodily Injury - worker fall, 18ft
+  Status: Closed
+  Incurred: $165,000
+
+Claim 2
+  Date of Loss: 02/2025
+  Cause of Loss: Bodily Injury - worker fall, 24ft
+  Status: Open
+  Incurred: $310,000
+  Reserve: $180,000
+
+Summary:
+  Total Incurred (5yr): $475,000
+  Loss Frequency Trend: Worsening (severity increasing)

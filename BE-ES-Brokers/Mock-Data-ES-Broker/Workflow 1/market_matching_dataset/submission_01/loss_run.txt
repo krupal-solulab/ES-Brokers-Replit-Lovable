@@ -1,0 +1,16 @@
+LOSS RUN REPORT
+Named Insured: Delta Electric Services LLC
+Policy Period Covered: 09/01/2024 - 09/01/2027 (3 years only - prior
+carrier unable to produce additional history, per broker cover note)
+
+Claim 1
+  Date of Loss: 05/14/2025
+  Cause of Loss: Property damage - miswired panel
+  Status: Closed
+  Incurred: $18,400
+
+No other claims in the 3-year period provided.
+
+Summary:
+  Total Incurred (3yr): $18,400
+  Years of History Provided: 3

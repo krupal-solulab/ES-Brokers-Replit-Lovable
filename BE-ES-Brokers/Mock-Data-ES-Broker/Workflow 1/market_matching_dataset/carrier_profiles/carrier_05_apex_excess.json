@@ -1,0 +1,19 @@
+{
+  "carrier_id": "CAR-05",
+  "carrier_name": "Apex Excess Lines",
+  "lines_written": ["General Liability"],
+  "class_codes_accepted": ["accounting/bookkeeping services", "landscaping", "general mercantile", "contractors - electrical", "contractors - plumbing"],
+  "class_codes_excluded": ["habitational", "roofing", "cannabis", "asbestos abatement", "trucking"],
+  "states_licensed": ["SC", "NC", "GA", "TN"],
+  "premium_band": {"min": 1000, "max": 50000},
+  "submission_requirements": {
+    "min_loss_run_years": 3,
+    "required_documents": ["ACORD 125", "ACORD 126", "3-year loss run", "current financials"],
+    "acceptance_window_days": 45
+  },
+  "severity_ceiling": {"max_single_claim_incurred": 75000},
+  "appetite_confidence": "medium",
+  "appetite_last_updated": "2027-03-01",
+  "historical_hit_rate_this_class": 0.58,
+  "notes": "Small commercial specialist - broad appetite but low premium ceiling, not a fit for larger or higher-severity accounts"
+}

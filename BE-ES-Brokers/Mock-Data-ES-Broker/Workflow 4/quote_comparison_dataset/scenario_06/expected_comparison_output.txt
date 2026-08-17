@@ -1,0 +1,28 @@
+EXPECTED COMPARISON OUTPUT — Continental Freight Carriers
+
+Comparability: N/A - single quote (excess layer, specialty market,
+only one carrier fit this profile per Market Matching Scenario 04)
+
+Quote status check (per QC-07):
+  Received: 07/19/2027
+  Valid through: 08/02/2027
+  AS OF TODAY (07/30/2027): only 3 DAYS REMAIN, and no broker action
+  has been logged - this quote has not yet even been forwarded to the
+  retail agent.
+
+RECOMMENDATION: This is not a comparison scenario in the normal sense
+- there's exactly one quote and no decision to weigh. The system's job
+here is a TIME-CRITICAL ALERT, not a comparison. Surface this at the
+top of the broker's queue with clear urgency, distinct from the routine
+"here's your comparison" framing used in Scenarios 01, 02, and 05.
+
+Note also the subjectivity: "primary carrier binding confirmed" - if
+the primary layer isn't yet bound, this excess quote may not even be
+actionable yet regardless of the 3-day window, which should be checked
+and surfaced as an additional flag, not assumed resolved.
+
+MODE: Urgent single-quote alert, not a comparison - this scenario
+exists specifically to test that Quote Comparison doesn't only fire a
+useful output when there are multiple quotes to compare; a single
+quote approaching its validity deadline is just as important a system
+responsibility as a multi-quote trade-off.

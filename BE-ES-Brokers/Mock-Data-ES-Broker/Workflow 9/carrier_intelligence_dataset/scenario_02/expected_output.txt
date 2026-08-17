@@ -1,0 +1,27 @@
+EXPECTED OUTPUT — Meridian / Landscaping (Sufficient Volume, Genuine Pattern)
+
+Signal aggregation (CI-01): 4 observed outcomes - 1 consistent (quoted,
+April), 3 inconsistent (all declined, June-July), 2 of the 3 explicitly
+citing "class no longer written."
+
+Consistency scoring (CI-02): 3 of last 3 recent outcomes (post-May)
+inconsistent with stated profile, following one earlier consistent
+outcome - pattern suggests a REAL, RECENT appetite shift, not noise.
+
+Suppression check (CI-05): NOT suppressed - sufficient volume (3 recent
+consistent inconsistencies) with an explicit carrier-stated reason
+("class no longer written") justifies surfacing this.
+
+Suggested profile change (CI-04): SUGGESTION GENERATED (human review
+required): "Meridian's stated profile lists landscaping as accepted
+(confidence: high, last updated 05/01/2027), but 3 of 3 submissions
+since June have been declined, 2 explicitly citing 'class no longer
+written.' Recommend reviewing whether landscaping should be removed
+from Meridian's accepted list or confidence downgraded."
+
+CRITICAL SYSTEM BEHAVIOR: this is a SUGGESTION requiring explicit human
+approval before the Carrier Appetite Profile is modified. The system
+NEVER auto-edits accepted/excluded class lists - per the permanent
+scope boundary established for this workflow across every prior PRD in
+this vertical, this is not a v1 limitation but a structural constraint
+on this workflow at any version.

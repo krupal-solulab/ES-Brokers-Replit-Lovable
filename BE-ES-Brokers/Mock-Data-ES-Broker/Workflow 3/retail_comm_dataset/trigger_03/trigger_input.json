@@ -1,0 +1,14 @@
+{
+  "trigger_type": "NO_MARKET_FOUND",
+  "source_workflow": "Market Matching",
+  "submission_id": "SUB-3306",
+  "named_insured": "GreenLeaf Cultivation Facility LLC",
+  "retail_agent_name": "Angela Ruiz",
+  "retail_agency": "Summit Risk Partners",
+  "agent_relationship_tenure": "3 years, moderate volume",
+  "zero_match_result": true,
+  "class_code": "cannabis - cultivation",
+  "diligent_search": {"required": true, "documentation_status": "generated_from_carrier_panel_review"},
+  "carriers_reviewed_count": 6,
+  "COMPLIANCE_FLAG": "Confirm with compliance whether specific declining carrier names may be disclosed to the retail agent/insured, or whether only an aggregate 'panel reviewed, no match' statement is appropriate - do not assume carrier-level disclosure is safe by default."
+}

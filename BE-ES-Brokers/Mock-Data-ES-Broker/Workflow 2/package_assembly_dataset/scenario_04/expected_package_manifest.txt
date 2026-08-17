@@ -1,0 +1,29 @@
+EXPECTED PACKAGE MANIFEST — Oakwood Apartment Homes -> Coastal Mutual Specialty
+
+STATUS: READY TO SEND
+
+Included documents:
+  [x] ACORD 125, ACORD 140, 5-year loss run, audited financials, SOV
+
+Supplemental form handling (Coastal Mutual Habitational Supplemental):
+  AUTO-FILLED from extracted SOV/application data:
+    - Year built: 2010 (from SOV)
+    - Construction type: Masonry/Steel Frame (from SOV)
+    - Sprinklered: Yes (from SOV)
+    - Total Insurable Value: $18,000,000 (from SOV)
+  FLAGGED FOR BROKER CONFIRMATION (not auto-filled):
+    - Unit count — NOT directly extracted from any source document in
+      this submission; system should NOT guess this from TIV/class
+      averages even though the carrier profile lists it as a
+      theoretically derivable field. Per PA-02, auto-fill is only
+      appropriate for fields with a direct, cited source in the
+      extracted data - never for inferred/estimated values on a form
+      that will be relied upon by an underwriter, regardless of
+      whether a plausible estimate could be computed.
+
+TONE NOTES: this scenario is deliberately included to test that the
+system resists an available shortcut (estimating unit count from TIV)
+even when the carrier's own supplemental form metadata suggests it's
+"auto-fillable" - the PRD's grounding requirement takes precedence over
+a convenience the carrier profile data implies. Flag it for the broker
+to fill in manually instead.

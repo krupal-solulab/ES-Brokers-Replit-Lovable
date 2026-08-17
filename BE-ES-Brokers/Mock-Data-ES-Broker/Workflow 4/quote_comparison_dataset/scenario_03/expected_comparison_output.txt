@@ -1,0 +1,33 @@
+EXPECTED COMPARISON OUTPUT — Summit Roofing Group
+
+One quote received (Ironclad), one late declination (Palmetto) after
+initial submission had gone in per the Package Assembly stage.
+
+Ironclad quote summary:
+  Premium: $118,000 | Limits: $1M/$2M | Deductible: $5,000
+  Subject to: signed app, updated loss control report within 60 days,
+  no new claims prior to binding
+  Quote valid through: 07/29/2027 — NARROW WINDOW, only ~1 day from
+  receipt at time of this comparison
+
+Palmetto declination:
+  Reason given: open claim severity ($180,000 reserve) outside their
+  low-slope-focused program's tolerance, DESPITE initial review looking
+  workable — this is a genuine appetite-intelligence signal (per QC-03)
+  worth logging for the future Carrier Appetite Intelligence workflow,
+  even though that workflow isn't built yet. In particular: Palmetto's
+  stated severity_ceiling in the Carrier Appetite Profile (from Market
+  Matching) was $150,000 — this declination is CONSISTENT with that
+  ceiling, meaning Market Matching's own ranking logic should have
+  already reflected this (and did — Palmetto was excluded from Summit
+  Roofing's ranked shortlist in the Market Matching dataset, Scenario
+  05). This declination is not a surprise; it reflects a broker's
+  choice to approach a carrier outside the top-ranked recommendation,
+  not a matching-engine miss.
+
+RECOMMENDATION: Only one bindable option exists (Ironclad). Given the
+narrow quote validity window (1 day remaining), this should be flagged
+as URGENT for broker action — not a leisurely comparison decision.
+
+MODE: Single option, time-critical — recommend immediate escalation to
+the broker rather than a routine comparison presentation.

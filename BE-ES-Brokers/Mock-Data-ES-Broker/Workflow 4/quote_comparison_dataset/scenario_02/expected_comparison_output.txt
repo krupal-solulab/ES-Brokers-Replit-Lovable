@@ -1,0 +1,28 @@
+EXPECTED COMPARISON OUTPUT — Oakwood Apartment Homes
+
+Comparability: NOT DIRECTLY COMPARABLE ON PREMIUM ALONE. Harbor
+Specialty Property's premium is $7,500 lower, but its deductibles are
+significantly higher across the board:
+  - All-perils deductible: $25,000 vs Coastal Mutual's $10,000
+  - Wind/Hail deductible: $100,000 vs Coastal Mutual's $50,000
+
+| | Coastal Mutual | Harbor Specialty |
+|---|---|---|
+| Premium | $81,500 | $74,000 |
+| Property | $18,000,000 | $18,000,000 |
+| GL | $1M/$2M | $1M/$2M |
+| All-perils deductible | $10,000 | $25,000 |
+| Wind/Hail deductible | $50,000 | $100,000 |
+| Effective retained risk exposure | Lower | Materially higher, especially for wind/hail given coastal proximity noted in original SOV |
+
+RECOMMENDATION: Do NOT present Harbor Specialty as simply "the cheaper
+option" without this context — per QC-01, the ~9% premium savings comes
+with a 2x increase in wind/hail retained risk, which is a materially
+different risk profile for a coastal property account, not just a
+cheaper version of the same policy. Present both options with this
+trade-off explained explicitly; let the broker (and ultimately the
+client) make an informed retained-risk-vs-premium decision rather than
+defaulting to the lower number.
+
+MODE: Multi-option presentation (per QC-06) — this is a genuine
+trade-off case, not a dominant-option case.

@@ -1,0 +1,32 @@
+EXPECTED PROCESSING OUTPUT — Summit Roofing Group
+
+Classification (per EP-01): UNDERWRITING-REVIEW-REQUIRED. A 2x limit
+increase is a material change to the carrier's exposure on this
+account, not a routine administrative endorsement - this cannot be
+auto-processed as a straightforward request the way Scenario 01's
+additional insured was.
+
+Appetite recheck (per EP-02): REQUIRED. Given this account already has
+an open claim reserved at $180,000 and a documented worsening severity
+trend at original binding (per the account's own history in the Market
+Matching/Quote Comparison datasets), doubling the limits materially
+increases Ironclad's exposure on an account that already carries
+elevated severity risk. This should be flagged for full underwriting
+re-review by the carrier, not processed as a routine limit bump -
+Ironclad's own severity ceiling ($500,000 per claim) doesn't
+automatically block this change, but the combination of factors here
+warrants underwriter judgment, not automated processing.
+
+Premium impact (per EP-03): PREMIUM-BEARING - a material limit
+increase virtually always carries additional premium; system should
+NOT draft this as a simple no-cost endorsement request.
+
+RECOMMENDATION: Route to the broker as an underwriting conversation
+with Ironclad, not a standard endorsement request - draft a submission
+of the change request WITH full context (current terms, requested
+change, relevant loss history) for the underwriter's independent
+review, rather than a routine "please process this endorsement" email.
+Given the 3-week timeline to the new contract, flag this as needing
+prompt underwriter attention, but do not imply to the retail agent that
+this is a guaranteed or routine change until the carrier's underwriting
+team weighs in.

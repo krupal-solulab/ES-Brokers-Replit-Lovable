@@ -1,0 +1,23 @@
+EXPECTED OUTPUT — Ironclad / Roofing (Mixed Signal, Ambiguous)
+
+Signal aggregation (CI-01): 3 outcomes, 2 consistent (quoted), 1
+inconsistent (declined, but with a stated account-specific reason -
+severity ceiling - not a class-level appetite statement).
+
+Consistency scoring (CI-02): the single inconsistent outcome carries an
+explicit account-specific reason rather than a general class-appetite
+statement - this should NOT be scored the same as Scenario 02's pattern,
+where the stated reasons were about the CLASS broadly ("no longer
+written"), not the specific account.
+
+Suppression check (CI-05): SUPPRESSED. This is a normal, expected
+pattern (an appetite-consistent carrier occasionally declining a
+specific account for account-specific severity reasons) - NOT a signal
+of a broader appetite shift. No suggestion generated.
+
+This scenario is included specifically to test that the system
+distinguishes "this carrier said no to this account for an
+account-specific reason" from "this carrier's stated class appetite
+appears to have changed" - conflating the two would generate constant,
+low-value noise from an entirely normal and expected pattern of
+occasional account-level declines.

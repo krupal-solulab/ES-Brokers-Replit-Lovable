@@ -1,0 +1,13 @@
+{
+  "submission_id": "SUB-3301",
+  "named_insured": "Continental Freight Carriers Inc.",
+  "broker_selected_carriers": ["CAR-06"],
+  "carrier_id": "CAR-06",
+  "carrier_name": "Vantage Excess Partners",
+  "carrier_requirements": {
+    "required_documents": ["ACORD 125", "ACORD 126", "5-year loss run", "audited financials", "5-year loss projection/actuarial summary"],
+    "min_loss_run_years": 5
+  },
+  "documents_available_from_extraction": ["ACORD 125", "ACORD 126", "5-year loss run", "audited financials"],
+  "missing_info_from_market_matching": []
+}

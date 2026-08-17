@@ -1,0 +1,25 @@
+EXPECTED COORDINATION OUTPUT — Oakwood Apartment Homes
+
+Pre-bind subjectivity status (per BI-02):
+  [ ] Loss control inspection - MATERIAL, NOT YET SCHEDULED - BLOCKING
+  [x] SOV confirmed - cleared
+  [x] No new claims - cleared
+
+SYSTEM BEHAVIOR: Per BI-02, this bind CANNOT be marked ready to send
+to the carrier as a formal bind order while a material pre-bind
+subjectivity remains unresolved. Status: BLOCKED, not "bind in
+progress." This is a direct extension of Package Assembly's BLOCKED
+concept and Quote Comparison's material-subjectivity flagging into the
+bind stage.
+
+RECOMMENDED BROKER ACTION: Schedule the loss control inspection
+immediately - carried over from the original quote's stated 10-day
+scheduling deadline (per the Quote Comparison dataset's Scenario 04,
+same underlying account). Effective date of 08/15/2027 is at real risk
+if this isn't resolved promptly.
+
+DOWNSTREAM TRIGGER: does NOT fire Placement Confirmation - that
+trigger is reserved for an actual clean bind (Scenario 01's case).
+Instead, this should surface as an urgent open item, consistent with
+the timeline-critical flag already raised in Quote Comparison for this
+same account.

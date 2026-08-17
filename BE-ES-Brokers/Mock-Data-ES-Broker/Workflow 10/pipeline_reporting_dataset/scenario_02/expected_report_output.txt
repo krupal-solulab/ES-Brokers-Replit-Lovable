@@ -1,0 +1,21 @@
+EXPECTED OUTPUT — Q3 2027 Carrier Hit-Rate (PR-02)
+
+| Carrier | Approached | Quote Rate | Bind Rate (of quotes) | Overall Hit Rate |
+|---|---|---|---|---|
+| Ironclad Casualty Solutions | 22 | 86.4% | 73.7% | 63.6% |
+| Vantage Excess Partners | 4 | 100.0% | 100.0% | 100.0% |
+
+FLAG: Vantage's 100% hit rate is based on only 4 submissions approached
+- this must be presented with a low-volume caveat, NOT ranked above
+Ironclad's 63.6% as if it were a more reliable or "better" carrier
+relationship on equal footing. A raw percentage with a tiny denominator
+is not comparable to one with a larger, more stable base - this is the
+same false-precision problem flagged all the way back in the original
+landing page review (fabricated-looking dashboard stats), now
+recurring in a legitimate reporting context where it's just as
+important to get right.
+
+RECOMMENDATION: Present Vantage's figure with an explicit "(n=4, low
+volume - interpret with caution)" annotation rather than a clean
+percentage presented with the same implied confidence as Ironclad's
+22-submission base.

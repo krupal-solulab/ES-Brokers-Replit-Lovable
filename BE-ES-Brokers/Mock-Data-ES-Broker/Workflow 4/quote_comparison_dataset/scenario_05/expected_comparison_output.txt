@@ -1,0 +1,32 @@
+EXPECTED COMPARISON OUTPUT — Brightline Facilities Group
+
+Comparability: PARTIALLY COMPARABLE — same core limits/deductible, but
+meaningfully different endorsement structure that matters a lot for
+this account type (facilities management, likely needs blanket
+additional-insured for client contracts).
+
+| | Meridian | Ironclad |
+|---|---|---|
+| Premium | $42,000 | $38,500 |
+| Additional Insured | Blanket (included) | Scheduled/per-project only |
+| Waiver of Subrogation | Blanket (included) | Additional premium |
+| Effective admin burden | Low - one-time setup | Higher - AI status must be added per contract |
+
+RECOMMENDATION: This is a genuine trade-off, not a dominant option.
+Ironclad is ~8% cheaper on premium, but a facilities management
+account like this frequently signs new client contracts requiring
+additional-insured status - a scheduled/per-project endorsement means
+real ongoing administrative work (and real risk of a gap if a contract
+is signed and the endorsement isn't added in time) versus Meridian's
+blanket coverage that handles this automatically.
+
+Do not default to recommending the lower premium here - the "cheaper"
+option may create more total cost/risk for THIS SPECIFIC account type
+than the $3,500 premium difference reflects. Present both clearly with
+this operational trade-off spelled out, and let the broker weigh in
+based on what they know about how actively Brightline signs new
+client contracts.
+
+MODE: Multi-option presentation (per QC-06) - textbook case of why a
+single "best" recommendation would actually be worse than presenting
+the trade-off honestly.

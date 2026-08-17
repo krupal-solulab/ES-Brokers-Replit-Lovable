@@ -1,0 +1,12 @@
+{
+  "carrier_id": "CAR-01",
+  "carrier_name": "Meridian Excess & Surplus",
+  "class_code": "landscaping",
+  "stated_profile": {"class_codes_accepted": ["contractors - electrical", "contractors - plumbing", "landscaping", "general mercantile"], "appetite_confidence": "high", "appetite_last_updated": "2027-05-01"},
+  "observed_outcomes": [
+    {"submission_id": "SUB-B1", "outcome": "declined", "date": "2027-06-10", "consistent_with_profile": false, "reason_given": "class no longer written"},
+    {"submission_id": "SUB-B2", "outcome": "declined", "date": "2027-06-25", "consistent_with_profile": false, "reason_given": "class no longer written"},
+    {"submission_id": "SUB-B3", "outcome": "declined", "date": "2027-07-15", "consistent_with_profile": false, "reason_given": "no reason given"},
+    {"submission_id": "SUB-B4", "outcome": "quoted", "date": "2027-04-01", "consistent_with_profile": true}
+  ]
+}

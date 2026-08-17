@@ -1,0 +1,8 @@
+{
+  "submission_id": "SUB-3307",
+  "named_insured": "Ridgeline Amusement Park LLC",
+  "state": "Texas",
+  "class_code": "amusement park operations",
+  "declinations_on_file": [],
+  "state_requirement": {"admitted_declinations_required": 3, "export_list_class": true, "export_list_note": "Amusement park liability is on Texas's export list - diligent search not required for this class"}
+}

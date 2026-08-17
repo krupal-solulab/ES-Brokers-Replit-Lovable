@@ -1,0 +1,18 @@
+{
+  "bind_id": "BIND-6605",
+  "named_insured": "Clearpath Bookkeeping Services LLC",
+  "carrier_id": "CAR-05",
+  "carrier_name": "Apex Excess Lines",
+  "current_terms": {
+    "premium": 2400,
+    "limits": "General Liability $1,000,000/$2,000,000 aggregate",
+    "effective_date": "2027-08-01",
+    "expiration_date": "2028-08-01"
+  },
+  "requested_change": {
+    "type": "employee_count_update",
+    "detail": "Update from 4 to 7 employees"
+  },
+  "current_date": "2027-09-27",
+  "days_remaining_in_term": 309
+}

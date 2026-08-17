@@ -1,0 +1,17 @@
+{
+  "bind_id": "BIND-6604",
+  "named_insured": "Summit Roofing Group LLC",
+  "incumbent_carrier_id": "CAR-03",
+  "incumbent_carrier_name": "Ironclad Casualty Solutions",
+  "expiring_terms": {"premium": 118000, "limits": "General Liability $1,000,000/$2,000,000", "effective_date": "2027-08-01"},
+  "expiring_term_loss_activity": "One new claim during expiring term - fall injury, reserved at $95,000",
+  "exposure_change": {"revenue_prior": 3950000, "revenue_current": 4100000, "pct_change": 3.8},
+  "incumbent_renewal_offer": {
+    "received": true,
+    "received_date": "2028-06-20",
+    "days_before_expiration": 42,
+    "premium": 187000,
+    "limits": "General Liability $1,000,000/$2,000,000",
+    "pct_premium_change": 58.5
+  }
+}

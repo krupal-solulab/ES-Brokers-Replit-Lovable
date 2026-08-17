@@ -1,0 +1,12 @@
+{
+  "submission_id": "SUB-3309",
+  "named_insured": "Continental Freight Carriers Inc.",
+  "states": ["TN", "GA", "NC", "SC", "VA", "AL", "MS", "FL"],
+  "class_code": "trucking - non-hazmat",
+  "state_requirements": {
+    "TN": {"admitted_declinations_required": 3, "export_list_class": false},
+    "GA": {"admitted_declinations_required": 3, "export_list_class": false},
+    "FL": {"admitted_declinations_required": 3, "export_list_class": true, "export_list_note": "trucking excess casualty may be export-eligible in FL for large commercial accounts"},
+    "note": "remaining states not yet checked against export list status"
+  }
+}

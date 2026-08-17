@@ -1,0 +1,24 @@
+EXPECTED PROCESSING OUTPUT — Continental Freight Carriers
+
+Classification (per EP-01): ROUTINE. Additional insured endorsements
+scheduled to a specific contract are standard, non-underwriting-review
+changes on an excess casualty policy of this type - no material change
+to the insured's own risk profile.
+
+Appetite recheck (per EP-02): NOT REQUIRED - routine classification
+means this doesn't touch class code, state, or severity exposure in a
+way that would require re-running Vantage's appetite criteria.
+
+Premium impact (per EP-03): NO ADDITIONAL PREMIUM expected - standard
+practice for a scheduled additional insured endorsement of this type.
+Flagged as "no premium impact anticipated" rather than assumed with
+full certainty, since final determination is the carrier's.
+
+Endorsement request drafted to carrier: requests addition of Midstate
+Distribution Co. as scheduled additional insured, referencing the
+specific contract, effective immediately per broker's request.
+
+RECOMMENDATION: Fast-track this - low complexity, low risk, broker
+requested urgency ("effective immediately if possible"), and nothing
+about this endorsement warrants the more careful, slower handling
+required for Scenario 02/03's material changes.

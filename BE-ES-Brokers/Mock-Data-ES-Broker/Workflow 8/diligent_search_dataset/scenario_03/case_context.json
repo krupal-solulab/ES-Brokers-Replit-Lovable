@@ -1,0 +1,11 @@
+{
+  "submission_id": "SUB-3308",
+  "named_insured": "Pinecrest Demolition Co.",
+  "state": "Florida",
+  "class_code": "demolition contractors",
+  "declinations_on_file": [
+    {"carrier": "Admitted Carrier A", "type": "admitted", "date": "2027-08-01", "written_evidence": true},
+    {"carrier": "Admitted Carrier B", "type": "admitted", "date": "2027-08-02", "written_evidence": false, "note": "verbal decline only, no written confirmation obtained"}
+  ],
+  "state_requirement": {"admitted_declinations_required": 3, "export_list_class": false}
+}

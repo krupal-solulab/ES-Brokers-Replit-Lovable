@@ -1,0 +1,18 @@
+{
+  "bind_id": "BIND-6603",
+  "named_insured": "Delta Electric Services LLC",
+  "carrier_id": "CAR-03",
+  "carrier_name": "Ironclad Casualty Solutions",
+  "current_terms": {
+    "premium": 26500,
+    "limits": "General Liability $1,000,000/$2,000,000 aggregate",
+    "effective_date": "2027-09-01",
+    "expiration_date": "2028-09-01"
+  },
+  "requested_change": {
+    "type": "add_operations_class",
+    "detail": "Add solar panel installation as an operations class"
+  },
+  "carrier_accepted_classes": ["contractors - electrical", "contractors - plumbing", "contractors - general", "contractors - roofing (all types)", "trucking - non-hazmat"],
+  "carrier_excluded_classes": ["habitational", "cannabis", "asbestos abatement"]
+}

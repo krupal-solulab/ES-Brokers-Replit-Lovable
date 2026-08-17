@@ -1,0 +1,18 @@
+{
+  "carrier_id": "CAR-02",
+  "carrier_name": "Palmetto Specialty Underwriters",
+  "lines_written": ["General Liability"],
+  "class_codes_accepted": ["contractors - electrical", "contractors - plumbing", "contractors - general", "contractors - roofing (low slope only)"],
+  "class_codes_excluded": ["habitational", "cannabis", "asbestos abatement"],
+  "states_licensed": ["SC", "NC", "GA"],
+  "premium_band": {"min": 15000, "max": 250000},
+  "submission_requirements": {
+    "min_loss_run_years": 5,
+    "required_documents": ["ACORD 125", "ACORD 126", "5-year loss run", "current financials", "supplemental contractor questionnaire"],
+    "acceptance_window_days": 45
+  },
+  "severity_ceiling": {"max_single_claim_incurred": 150000},
+  "appetite_confidence": "high",
+  "appetite_last_updated": "2027-06-15",
+  "historical_hit_rate_this_class": 0.71
+}
