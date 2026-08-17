@@ -37,6 +37,29 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Insurance OS Backend", version="0.0.0", lifespan=lifespan)
 
+
+@app.middleware("http")
+async def data_mode_middleware(request, call_next):
+    """Resolves the product-wide data mode (live vs static fixture data) ONCE
+    per API request and pins it in a contextvar, so every connector/LLM
+    factory consulted during the request agrees — never a half-live screen.
+    See core/data_mode.py. Cheap: the connection check is cached per tenant."""
+    from core.data_mode import resolve_data_mode, set_current_data_mode
+
+    tenant_id = request.headers.get("x-tenant-id")
+    token = None
+    if tenant_id:
+        async with async_session_factory() as session:
+            mode = await resolve_data_mode(session, tenant_id)
+        token = set_current_data_mode(mode)
+    try:
+        return await call_next(request)
+    finally:
+        if token is not None:
+            from core.data_mode import _current_data_mode
+
+            _current_data_mode.reset(token)
+
 # Dev-only: the Lovable-managed frontends' sandbox dev servers are pinned to
 # port 8080 by convention (@lovable.dev/vite-tanstack-config), but Vite falls
 # through to the next free port (8081, 8082, ...) when 8080 is already taken

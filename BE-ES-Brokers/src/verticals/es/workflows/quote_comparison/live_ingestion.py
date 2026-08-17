@@ -49,10 +49,9 @@ async def _real_named_insured(session: AsyncSession, ctx: Ctx, submission_id: st
 
 
 def _require_live_connector(session: AsyncSession) -> LiveNangoConnectorService:
-    connector = build_connector_service(session=session)
-    if not isinstance(connector, LiveNangoConnectorService):
-        raise ConnectorNotConnectedError(get_settings().nango_integration_mail)
-    return connector
+    from core.ingestion.connectors import unwrap_live_connector
+
+    return unwrap_live_connector(build_connector_service(session=session))
 
 
 async def discover_live_carrier_responses(

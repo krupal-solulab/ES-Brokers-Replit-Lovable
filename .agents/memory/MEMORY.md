@@ -7,4 +7,5 @@
 - [Pipeline Reporting FR-4/FR-6](pipeline-reporting-fr4-fr6.md) — PipelineStageEvent table (f3a7d1e9c204); PA run_live writes BLOCKED entry/exit; engine builds carrier-attributed TTP; RevenueAttribution always provisional; commission_rates_json per-tenant setting.
 - [Live PDF extraction deps](live-pdf-extraction-deps.md) — pypdf/docx/openpyxl must exist in .pythonlibs or live attachments become base64 noise; install via `uv pip install --prefix .pythonlibs`; backend port 4000.
 - [MM Workflow 1 contracts](mm-workflow1-contracts.md) — engine-recorded outcome codes; Send = audited PA handoff (senior/admin, carrier_ids); override needs typed reason; dataset tests skip w/o TEST_DATA_ROOT.
+- [Static data fallback](static-data-fallback.md) — request-scoped data-mode contextvar drives connector+LLM factories; writebacks excluded; use unwrap_live_connector, invalidate_connection_cache.
 - [FR-8 State Retention Reference](fr8-state-retention-reference.md) — global StateRetentionReference table (a2b3c4d5e6f7); loader validates each entry; null → pending is structurally enforced, not convention.

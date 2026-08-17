@@ -50,10 +50,9 @@ _ISSUED_ENDORSEMENT_FILENAME = "carrier_issued_endorsement.txt"
 
 
 def _require_live_connector(session: AsyncSession) -> LiveNangoConnectorService:
-    connector = build_connector_service(session=session)
-    if not isinstance(connector, LiveNangoConnectorService):
-        raise ConnectorNotConnectedError(get_settings().nango_integration_mail)
-    return connector
+    from core.ingestion.connectors import unwrap_live_connector
+
+    return unwrap_live_connector(build_connector_service(session=session))
 
 __all__ = [
     "build_bound_policy_context_from_binder",

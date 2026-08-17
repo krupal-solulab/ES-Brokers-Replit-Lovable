@@ -99,10 +99,9 @@ def _parse_money(value: Any) -> float | None:
 
 
 def _require_live_connector(session: AsyncSession) -> LiveNangoConnectorService:
-    connector = build_connector_service(session=session)
-    if not isinstance(connector, LiveNangoConnectorService):
-        raise ConnectorNotConnectedError(get_settings().nango_integration_mail)
-    return connector
+    from core.ingestion.connectors import unwrap_live_connector
+
+    return unwrap_live_connector(build_connector_service(session=session))
 
 
 async def _binder_issuance_rows(session: AsyncSession, ctx: Ctx) -> list[OutputPackageRow]:

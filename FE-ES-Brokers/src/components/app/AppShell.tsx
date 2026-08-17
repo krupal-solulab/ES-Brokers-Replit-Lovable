@@ -29,6 +29,8 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { clearIdentity, getIdentity } from "@/lib/api/identity";
+import { getDataMode } from "@/lib/api/dataMode";
+import { useQuery } from "@tanstack/react-query";
 
 const workflows = [
   { slug: "submission-matching", label: "Submission Market Matching", icon: Inbox, badge: "12" },
@@ -54,6 +56,38 @@ const misc = [
   { to: "/app/settings", label: "Settings", icon: Settings },
 ];
 
+const DATA_MODE_REASON_LABEL: Record<string, string> = {
+  mock_mode: "Connectors in mock mode",
+  connector_disconnected: "A connector is disconnected",
+  llm_insufficient_quota: "AI provider out of quota",
+};
+
+/** Mandatory product-wide banner: whenever the backend resolves data mode to
+ * "static", every workflow screen and report is serving fixture/sample data —
+ * this must be obvious everywhere, so it renders in the shell above <main>. */
+function StaticDataBanner() {
+  const query = useQuery({
+    queryKey: ["data-mode"],
+    queryFn: getDataMode,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+  const dm = query.data;
+  if (!dm || dm.mode !== "static") return null;
+  return (
+    <div
+      role="status"
+      className="sticky top-0 z-40 flex items-center justify-center gap-2 border-b border-amber-500/40 bg-amber-500/15 px-4 py-1.5 text-center text-[13px] font-medium text-amber-700 dark:text-amber-400"
+    >
+      <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+      Demo / sample data — not live
+      {DATA_MODE_REASON_LABEL[dm.reason] ? (
+        <span className="font-normal opacity-80">· {DATA_MODE_REASON_LABEL[dm.reason]}</span>
+      ) : null}
+    </div>
+  );
+}
+
 export function AppShell() {
   const loc = useLocation();
   const [copilotOpen, setCopilotOpen] = useState(false);
@@ -76,6 +110,7 @@ export function AppShell() {
       <div className="flex min-h-screen">
         <Sidebar pathname={loc.pathname} />
         <div className="flex min-h-screen flex-1 flex-col">
+          <StaticDataBanner />
           <TopBar crumbs={crumbs} onOpenCopilot={() => setCopilotOpen(true)} />
           <main className="flex-1 px-6 py-6 md:px-10 md:py-10">
             <Outlet />

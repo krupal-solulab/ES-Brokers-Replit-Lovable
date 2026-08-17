@@ -1,0 +1,48 @@
+Add a product-wide "static data fallback" so the app serves per-workflow fixture data
+instead of erroring, under ANY of these three conditions. Reuse the EXISTING mock path
+(MockConnectorService + fixtures/loader.py reading TEST_DATA_ROOT/Workflow_<N>/test_dataset)
+— do not build a parallel data source.
+
+1. ADD a single resolver: resolve_data_mode(tenant_id, session) -> ("live" | "static", reason).
+   Returns "static" when ANY of these is true (else "live"):
+   a. effective connectors_mode == "mock"                      -> reason "mock_mode"
+   b. a required connector (Gmail/Nango, and any other the operation needs) is NOT
+      connected                                                -> reason "connector_disconnected"
+   c. the LLM provider is out of quota/balance (an OpenAI insufficient_quota / 429 billing
+      error was seen, tracked via a short-lived cached flag)   -> reason "llm_insufficient_quota"
+   Respect the existing per-tenant admin override for connectors_mode.
+
+2. WIRE the connector factory: in build_connector_service, when resolve_data_mode is
+   "static", return MockConnectorService(workflow_n=...) even if connectors_mode == "live".
+   Replace the current "raise ConnectorNotConnectedError -> 428" behavior so a disconnected
+   connector falls back to static data instead of erroring. (Keep a way for the Settings
+   page to still show real connection status.)
+
+3. WIRE the AI layer: before any LLM call, if resolve_data_mode is "static", SKIP the live
+   LLM call and use the static/deterministic fixture output for that workflow (the dataset's
+   expected_output / the deterministic engine result). Additionally, wrap live LLM calls so
+   that an insufficient_quota / 429 billing error is caught, sets the reason-(c) flag, and
+   falls back to the static output for that request instead of failing. Never fabricate a
+   number — static output comes from the fixtures/engine, per the Deterministic Logic Boundary.
+
+4. APPLY across the WHOLE product: every workflow's live-inbox, run, and AI-drafting paths,
+   plus the dashboards/reporting, must go through resolve_data_mode so they all show static
+   data together under any triggering condition — never a half-live/half-static screen.
+
+5. EXPOSE the mode for the UI: add data mode + reason to a status/health endpoint the frontend
+   already calls (or add GET /api/core/data-mode -> {mode, reason}).
+
+6. MANDATORY UI LABEL (do not skip): whenever mode == "static", show a persistent, clearly
+   visible banner/badge across the whole app: "Demo / sample data — not live" with the reason
+   ("Connectors in mock mode" / "A connector is disconnected" / "AI provider out of quota").
+   It must be obvious on every workflow screen and every report, not hidden in a footer. In
+   "live" mode with everything working, no banner shows and behavior is unchanged.
+
+VERIFY:
+- connectors_mode="mock": whole app shows fixture data + the demo banner; no LLM calls made.
+- connectors_mode="live" but Gmail disconnected: app shows fixture data + banner (reason
+  connector_disconnected), no 428 error.
+- connectors_mode="live", Gmail connected, but LLM returns insufficient_quota: the request
+  falls back to static output + banner (reason llm_insufficient_quota), no crash.
+- connectors_mode="live", all connected, LLM funded: real live data, NO banner, unchanged
+  behavior, and the existing test suite still passes.
