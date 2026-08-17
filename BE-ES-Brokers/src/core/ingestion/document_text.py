@@ -9,7 +9,10 @@ storing the raw bytes rather than fabricating content.
 from __future__ import annotations
 
 import io
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def extract_text(filename: str, raw_bytes: bytes) -> str | None:
@@ -25,7 +28,13 @@ def extract_text(filename: str, raw_bytes: bytes) -> str | None:
             text = _extract_xlsx(raw_bytes)
         else:
             return None
+    except ImportError:
+        # A missing extraction library is an environment bug, not a bad file —
+        # swallowing it silently turns every attachment into base64 noise.
+        logger.exception("document text extraction dependency missing for %s", filename)
+        raise
     except Exception:
+        logger.warning("document text extraction failed for %s", filename, exc_info=True)
         return None
     return text if text and text.strip() else None
 
