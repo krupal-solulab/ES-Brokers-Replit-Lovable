@@ -686,3 +686,68 @@ async def test_scenario_03_fr2_gap_new_metrics_not_interpolated(es_ctx: Ctx) -> 
     assert payload["revenue_attribution"] == [], (
         "Revenue attribution must not be guessed from a partial-funnel scenario"
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PR-02/FR-3: distinct-submission carrier counting + >100% rate guard
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def test_carrier_activity_counts_distinct_submissions_not_line_items() -> None:
+    """A carrier quoted twice for the same submission (original quote AND a
+    renewal-offer quote in a second comparison record) counts ONCE — so its
+    quote rate can never exceed 100%."""
+    from verticals.es.workflows.pipeline_reporting.live_aggregator import (
+        _build_carrier_activity,
+    )
+    from verticals.es.workflows.pipeline_reporting.reporting_engine import (
+        build_carrier_performance,
+    )
+
+    pa_rows = [{"submission_id": "SUB-1", "carrier_name": "Ironclad"}]
+    qc_rows = [
+        {
+            "submission_id": "SUB-1",
+            "quotes": [{"carrier_name": "Ironclad", "response_type": "QUOTE"}],
+        },
+        {  # renewal-offer comparison for the SAME submission — must not double-count
+            "submission_id": "SUB-1",
+            "quotes": [{"carrier_name": "Ironclad", "response_type": "QUOTE"}],
+        },
+    ]
+    bi_rows = [
+        {
+            "submission_id": "SUB-1",
+            "carrier_name": "Ironclad",
+            "carrier_confirmation": {"binder_number": "BN-1"},
+        }
+    ]
+
+    activity = _build_carrier_activity(pa_rows, qc_rows, bi_rows)
+    assert activity == [
+        {
+            "carrier_name": "Ironclad",
+            "submissions_approached": 1,
+            "quotes_issued": 1,
+            "binds": 1,
+        }
+    ]
+
+    perf = build_carrier_performance(activity, min_reliable_volume=1)
+    assert perf[0].quote_rate == 100.0
+    assert perf[0].bind_rate == 100.0
+    assert perf[0].overall_hit_rate == 100.0
+
+
+def test_carrier_performance_guard_rejects_rate_above_100() -> None:
+    """If upstream counting ever regresses to raw line items, the engine fails
+    loudly instead of publishing an impossible >100% rate (PR-02/FR-3)."""
+    from verticals.es.workflows.pipeline_reporting.reporting_engine import (
+        build_carrier_performance,
+    )
+
+    bad_activity = [
+        {"carrier_name": "Ironclad", "submissions_approached": 1, "quotes_issued": 2, "binds": 1}
+    ]
+    with pytest.raises(ValueError, match="above 100%"):
+        build_carrier_performance(bad_activity, min_reliable_volume=1)

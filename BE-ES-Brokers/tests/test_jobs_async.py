@@ -31,6 +31,10 @@ async def _tenant_exists(tenant_id: str) -> bool:
 
 
 async def test_ingest_and_extract_success_records_job_run() -> None:
+    import os
+
+    if not os.environ.get("TEST_DATA_ROOT"):
+        pytest.skip("TEST_DATA_ROOT not set; fixture submission_02 unavailable")
     if not await _tenant_exists("demo-es"):
         pytest.skip("demo-es tenant not seeded; run `python src/core/seed.py`")
 

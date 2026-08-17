@@ -105,30 +105,39 @@ def _build_funnel_data(
 def _build_carrier_activity(
     pa_rows: list[dict[str, Any]], qc_rows: list[dict[str, Any]], bi_rows: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    approached: dict[str, int] = defaultdict(int)
-    quoted: dict[str, int] = defaultdict(int)
-    binds: dict[str, int] = defaultdict(int)
+    # PR-02/FR-3: count DISTINCT SUBMISSIONS per carrier at each stage — never
+    # raw line items. A carrier appearing in two quote-comparison records for
+    # the same submission (e.g. an original quote AND a renewal-offer quote)
+    # must count once, or its quote rate can exceed 100%.
+    approached: dict[str, set[str]] = defaultdict(set)
+    quoted: dict[str, set[str]] = defaultdict(set)
+    binds: dict[str, set[str]] = defaultdict(set)
 
     for r in pa_rows:
         name = r.get("carrier_name")
-        if name:
-            approached[name] += 1
+        sub = r.get("submission_id")
+        if name and sub:
+            approached[name].add(sub)
     for r in qc_rows:
+        sub = r.get("submission_id")
+        if not sub:
+            continue
         for q in r.get("quotes", []):
             name = q.get("carrier_name")
             if name and q.get("response_type") == "QUOTE":
-                quoted[name] += 1
+                quoted[name].add(sub)
     for r in bi_rows:
         name = r.get("carrier_name")
-        if name and (r.get("carrier_confirmation") or {}).get("binder_number"):
-            binds[name] += 1
+        sub = r.get("submission_id")
+        if name and sub and (r.get("carrier_confirmation") or {}).get("binder_number"):
+            binds[name].add(sub)
 
     return [
         {
             "carrier_name": name,
-            "submissions_approached": approached[name],
-            "quotes_issued": quoted.get(name, 0),
-            "binds": binds.get(name, 0),
+            "submissions_approached": len(approached[name]),
+            "quotes_issued": len(quoted.get(name, set())),
+            "binds": len(binds.get(name, set())),
         }
         for name in sorted(approached)  # approached > 0 for every key here, by construction
     ]

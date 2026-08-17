@@ -1,0 +1,29 @@
+Pipeline & Carrier Performance Reporting has a carrier hit-rate bug and two display
+inconsistencies. Fix all three; change no other reporting logic.
+
+BUG 1 — quote/bind rates can exceed 100% (Ironclad shows quote rate 200%, bind rate
+50%). Root cause in live_aggregator.py _build_carrier_activity: `quoted[name]` counts
+every QUOTE line item across all quote-comparison records, so a carrier that appears
+in two comparisons (e.g. an original quote AND a renewal-offer quote) is counted
+twice, while `approached` counts distinct submissions.
+FIX: count DISTINCT SUBMISSIONS per carrier at each stage. Track a set of submission
+ids per carrier for approached, quoted, and bound, then use the set sizes. quote_rate
+= distinct submissions quoted / distinct submissions approached; bind_rate = distinct
+submissions bound / distinct submissions quoted; overall = bound / approached. Add a
+guard/assertion that no rate exceeds 100% (per PR-02/FR-3). The carrier table's quote
+count must now agree with the funnel's "Quotes Received".
+
+FIX 2 — the top summary tiles ("Reports generated", "Reports with a data gap",
+"Low-volume carrier flags") read 0 while the on-screen live report shows 4 low-volume
+flags. Make these tiles reflect the report currently displayed (or persist the report
+on "Generate live report" and count from saved reports) — they must never contradict
+the table below them.
+
+FIX 3 — the top "Revenue attribution (PR-04)" tile says "Not built", but the
+provisional revenue table below is implemented and shows "not configured". Update the
+tile to read "Provisional — not configured (needs real commission data)" so it matches.
+
+VERIFY with the Briarcliff data: Ironclad quote rate and bind rate are now <= 100% and
+consistent with the funnel; the low-volume flag count in the top tile equals the number
+of flagged carriers in the table; the revenue tile and table agree. Also confirm
+whether "Submissions Received: 2" is the renewal cycle (expected) or a duplicate.

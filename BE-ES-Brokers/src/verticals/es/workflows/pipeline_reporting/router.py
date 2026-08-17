@@ -97,7 +97,12 @@ async def run_pipeline_reporting_live(ctx: CtxDep, session: SessionDep) -> Revie
     Remarketing) instead of the Workflow_19 fixture. See
     ``live_aggregator.py``."""
     pipeline = _pipeline()
-    output = await pipeline.run_live(ctx, session)
+    try:
+        output = await pipeline.run_live(ctx, session)
+    except ValueError as exc:
+        # PR-02/FR-3 rate-invariant violation (or similar data-integrity issue):
+        # surface as a controlled 422 with the reason, never an unhandled 500.
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
     review_queue = DefaultReviewQueueService()
     item = await review_queue.enqueue(session, ctx, output, WORKFLOW_NAME)
@@ -117,9 +122,34 @@ async def list_pipeline_reporting(ctx: CtxDep, session: SessionDep) -> list[Revi
             )
         )
     ).scalars().all()
-    return [
-        ReviewItemOut(id=r.id, submission_id=r.submission_id, status=r.status.value) for r in rows
-    ]
+    # Payload included so the FE summary tiles (reports generated / data gaps /
+    # low-volume flags) can count from saved reports and never contradict the
+    # report table rendered below them. Packages are fetched in ONE bulk query
+    # (no N+1), and rows are ordered oldest→newest so the FE's "most recent"
+    # fallback (last item) is deterministic.
+    rows = sorted(rows, key=lambda r: r.created_at)
+    pkg_ids = [r.output_package_id for r in rows if r.output_package_id]
+    pkgs_by_id: dict[str, OutputPackageRow] = {}
+    if pkg_ids:
+        pkgs = (
+            await session.execute(
+                select(OutputPackageRow).where(
+                    col(OutputPackageRow.tenant_id) == ctx.tenant_id,
+                    col(OutputPackageRow.id).in_(pkg_ids),
+                )
+            )
+        ).scalars().all()
+        pkgs_by_id = {p.id: p for p in pkgs}
+    out: list[ReviewItemOut] = []
+    for r in rows:
+        pkg = pkgs_by_id.get(r.output_package_id) if r.output_package_id else None
+        out.append(
+            ReviewItemOut(
+                id=r.id, submission_id=r.submission_id, status=r.status.value,
+                payload=PipelineReportPayload(**pkg.payload) if pkg and pkg.payload else None,
+            )
+        )
+    return out
 
 
 @router.get("/{item_id}")

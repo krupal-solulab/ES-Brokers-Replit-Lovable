@@ -606,16 +606,17 @@ async def test_gap_policy_profile_row_gap_policy_feeds_assembly(
 
 async def test_empty_store_fallback_no_crash(session: AsyncSession, tenant: Tenant) -> None:
     """With no profiles seeded, get_profiles_for_matching falls back to the JSON panel.
-    Since TEST_DATA_ROOT is not set, load_carrier_panel() returns []; this is the
-    expected behaviour — Market Matching produces no matches, not a crash.
+    Even without TEST_DATA_ROOT, load_carrier_panel() falls back to the repo-bundled
+    carrier profiles — the panel is never empty, so Market Matching never silently
+    matches nothing after a DB reset.
     """
     profiles = await CarrierProfileService.get_profiles_for_matching(
         session, tenant.id, workflow_n=10
     )
-    # Empty or not — but must not raise.
+    # Must not raise, and must return the bundled 6-carrier panel.
     assert isinstance(profiles, list)
-    # TEST_DATA_ROOT is not set so JSON panel also returns [].
-    assert profiles == []
+    assert len(profiles) == 6
+    assert {p.carrier_id for p in profiles} == {f"CAR-0{i}" for i in range(1, 7)}
 
 
 async def test_empty_store_after_seed_db_path_taken(
@@ -648,11 +649,13 @@ async def test_empty_store_separate_tenants_isolated(
         session, "t-alpha", [_make_carrier("CAR-X"), _make_carrier("CAR-Y")]
     )
 
-    # t2 sees an empty store → fallback.
+    # t2 sees an empty store → falls back to the bundled 6-carrier JSON panel,
+    # NOT t1's seeded profiles.
     t2_profiles = await CarrierProfileService.get_profiles_for_matching(
         session, "t-beta", workflow_n=10
     )
-    assert t2_profiles == []
+    assert len(t2_profiles) == 6
+    assert {p.carrier_id for p in t2_profiles}.isdisjoint({"CAR-X", "CAR-Y"})
 
     # t1 sees its own 2 carriers.
     t1_profiles = await CarrierProfileService.get_profiles_for_matching(

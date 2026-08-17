@@ -135,6 +135,15 @@ def build_carrier_performance(
         quote_rate = round(quoted / approached * 100, 1) if approached > 0 else 0.0
         bind_rate = round(binds / quoted * 100, 1) if quoted > 0 else 0.0
         overall_hit_rate = round(binds / approached * 100, 1) if approached > 0 else 0.0
+        # PR-02/FR-3 guard: rates are distinct-submission ratios and can never
+        # exceed 100%. A violation means upstream counting regressed to raw
+        # line items — fail loudly rather than publish an impossible rate.
+        if quote_rate > 100.0 or bind_rate > 100.0 or overall_hit_rate > 100.0:
+            raise ValueError(
+                f"carrier '{c['carrier_name']}' has a hit rate above 100% "
+                f"(quote={quote_rate}, bind={bind_rate}, overall={overall_hit_rate}) — "
+                "stage counts must be distinct submissions per carrier (PR-02/FR-3)"
+            )
         results.append(
             CarrierPerformance(
                 carrier_name=c["carrier_name"],

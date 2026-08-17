@@ -6541,16 +6541,20 @@ export function PipelineCarrierReporting() {
   // never this string.
   const items = (listQuery.data ?? []).filter((i) => i.payload?.period === "Live (current data)");
   const gapCount = items.filter((i) => i.payload?.data_completeness.status === "PARTIAL").length;
-  const lowVolumeCarrierCount = items.reduce(
-    (sum, i) => sum + (i.payload?.carrier_performance.filter((c) => c.low_volume_flag).length ?? 0),
-    0,
-  );
 
   const detailQuery = useQuery({
     queryKey: ["pipeline-reporting", "detail", selectedId],
     queryFn: () => getPipelineReporting(selectedId!),
     enabled: Boolean(selectedId),
   });
+
+  // Low-volume flags must describe the report shown below the tiles — the
+  // selected report, or the most recent saved one before a selection is made —
+  // never a sum across all saved reports (which would contradict the table).
+  const displayedPayload =
+    detailQuery.data?.payload ?? items[items.length - 1]?.payload ?? null;
+  const lowVolumeCarrierCount =
+    displayedPayload?.carrier_performance.filter((c) => c.low_volume_flag).length ?? 0;
 
   const runLiveMutation = useMutation({
     mutationFn: runPipelineReportingLive,
@@ -6593,8 +6597,8 @@ export function PipelineCarrierReporting() {
           <div className="text-[11px] text-muted-foreground">
             Pulls logs already produced by the prior E&S workflows for the selected period. No
             predictive forecasting, automated threshold alerting, or individual broker
-            scorecarding. Revenue attribution (PR-04) is intentionally not built — it needs real
-            commission-structure data from discovery, not an assumption.
+            scorecarding. Revenue attribution (PR-04) is provisional — estimates only, until
+            real commission-structure data from discovery is configured.
           </div>
         </div>
       </div>
@@ -6617,8 +6621,8 @@ export function PipelineCarrierReporting() {
         />
         <GovKpi
           label="Revenue attribution (PR-04)"
-          value="Not built"
-          sub="Needs real commission data — by design"
+          value="Provisional — not configured (needs real commission data)"
+          sub="Matches the provisional revenue table below"
         />
       </div>
 

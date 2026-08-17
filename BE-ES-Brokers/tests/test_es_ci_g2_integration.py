@@ -107,6 +107,12 @@ _MERIDIAN_SIGNALS: list[dict[str, Any]] = [
 
 # Scenario 03 — Ironclad Casualty Solutions / roofing  (INSUFFICIENT_SIGNAL)
 _IRONCLAD_NAME = "Ironclad Casualty Solutions"
+
+# Bundled JSON panel ids (load_carrier_panel falls back to the repo-bundled
+# panel even without TEST_DATA_ROOT, so live discovery resolves names to these).
+_COASTAL_ID = "CAR-04"
+_MERIDIAN_ID = "CAR-01"
+_IRONCLAD_ID = "CAR-03"
 _IRONCLAD_SIGNALS: list[dict[str, Any]] = [
     {"sub": "SUB-C1", "reason": None, "consistent": True, "date": "2027-05-01"},
     {"sub": "SUB-C2", "reason": "severity exceeded ceiling for this specific account", "consistent": False, "date": "2027-06-01"},
@@ -195,11 +201,11 @@ def _seed_profile(
     carrier_id: str | None = None,
     appetite_confidence: str = "high",
 ) -> CarrierProfile:
-    """Return a CarrierProfile for seeding.  ``carrier_id`` defaults to
-    ``carrier_name`` — this is correct when the JSON panel is unavailable
-    (TEST_DATA_ROOT not set), because ``build_live_signal_log`` falls back
-    to using carrier_name as the id."""
-    cid = carrier_id or carrier_name
+    """Return a CarrierProfile for seeding.  ``carrier_id`` defaults to the
+    bundled panel id for known carrier names — live discovery resolves names
+    through the repo-bundled JSON panel, so seeded rows must share those ids."""
+    panel_ids = {_COASTAL_NAME: _COASTAL_ID, _MERIDIAN_NAME: _MERIDIAN_ID, _IRONCLAD_NAME: _IRONCLAD_ID}
+    cid = carrier_id or panel_ids.get(carrier_name, carrier_name)
     return CarrierProfile(
         carrier_id=cid,
         carrier_name=carrier_name,
@@ -293,10 +299,10 @@ async def test_confirmed_consistent_batch_writes_profile_version(
     session.add(qc_row)
     await session.commit()
 
-    # Seed the carrier profile (carrier_id = carrier_name since no JSON panel).
+    # Seed the carrier profile (carrier_id = bundled panel id).
     profiles = [_seed_profile(ctx.tenant_id, _COASTAL_NAME, appetite_confidence="high")]
     await CarrierProfileService.seed_from_json(session, ctx.tenant_id, profiles)
-    v1 = await CarrierProfileService.get_latest(session, ctx.tenant_id, _COASTAL_NAME)
+    v1 = await CarrierProfileService.get_latest(session, ctx.tenant_id, _COASTAL_ID)
     assert v1 is not None, "pre-condition: profile must exist before batch run"
     assert v1.source == SOURCE_SEED
 
@@ -324,7 +330,7 @@ async def test_confirmed_consistent_batch_writes_profile_version(
         appetite_confidence=mr_payload["appetite_confidence"],
         appetite_last_updated=mr_payload["appetite_last_updated"],
     )
-    v2 = await CarrierProfileService.refresh_metadata(session, ctx, _COASTAL_NAME, dto)
+    v2 = await CarrierProfileService.refresh_metadata(session, ctx, _COASTAL_ID, dto)
 
     # ── Assertion 1: New version created with CI source. ──────────────────────
     assert v2.version_id != v1.version_id
@@ -386,13 +392,13 @@ async def test_confirmed_consistent_monitor_emits_ci_metadata_refreshed_alert(
     alert = alerts[0]
     assert alert.alert_type == "CI_METADATA_REFRESHED"
     assert alert.severity == "INFO"
-    assert alert.entity_ref == _COASTAL_NAME  # carrier_id = name when no panel
+    assert alert.entity_ref == _COASTAL_ID  # carrier_id from bundled panel
     assert alert.payload["appetite_confidence"]  # must be populated (non-empty)
     assert alert.payload["appetite_last_updated"]  # must be populated
 
     # Profile has a new CI version.
     v_current, history = await CarrierProfileService.get_with_history(
-        session, ctx.tenant_id, _COASTAL_NAME
+        session, ctx.tenant_id, _COASTAL_ID
     )
     assert v_current is not None
     assert v_current.source == SOURCE_CI
@@ -446,7 +452,7 @@ async def test_confirmed_consistent_idempotent_skip_already_refreshed_today(
 
     # Still only 2 versions total: SEED + one CI (not two CI).
     _curr, history = await CarrierProfileService.get_with_history(
-        session, ctx.tenant_id, _COASTAL_NAME
+        session, ctx.tenant_id, _COASTAL_ID
     )
     assert len(history) == 1, f"Expected SEED + 1 CI version, found {len(history) + 1} total"
 
@@ -504,7 +510,7 @@ async def test_genuine_inconsistency_batch_creates_suggestion_no_profile_change(
         session, ctx.tenant_id,
         [_seed_profile(ctx.tenant_id, _MERIDIAN_NAME, appetite_confidence="high")],
     )
-    v1 = await CarrierProfileService.get_latest(session, ctx.tenant_id, _MERIDIAN_NAME)
+    v1 = await CarrierProfileService.get_latest(session, ctx.tenant_id, _MERIDIAN_ID)
     assert v1 is not None
 
     # Run pipeline (same as monitor) and enqueue via review queue.
@@ -548,7 +554,7 @@ async def test_genuine_inconsistency_batch_creates_suggestion_no_profile_change(
     assert pkg.payload.get("suggested_action")
 
     # ── Assertion 3: NO profile field auto-changed. ───────────────────────────
-    versions = await _profile_versions(session, ctx.tenant_id, _MERIDIAN_NAME)
+    versions = await _profile_versions(session, ctx.tenant_id, _MERIDIAN_ID)
     assert len(versions) == 1, (
         "GENUINE_INCONSISTENCY must NOT write a new profile version — "
         f"found {len(versions)} versions"
@@ -588,7 +594,7 @@ async def test_genuine_inconsistency_monitor_emits_ci_suggestion_created_alert(
     alert = alerts[0]
     assert alert.alert_type == "CI_SUGGESTION_CREATED"
     assert alert.severity == "WARN"
-    assert alert.entity_ref == _MERIDIAN_NAME
+    assert alert.entity_ref == _MERIDIAN_ID
 
     # Alert payload shows 2 class-level inconsistent declines.
     assert alert.payload["class_level_inconsistent_count"] == 2, (
@@ -603,7 +609,7 @@ async def test_genuine_inconsistency_monitor_emits_ci_suggestion_created_alert(
     assert items[0].status == ReviewStatus.PENDING
 
     # Profile NOT modified.
-    versions = await _profile_versions(session, ctx.tenant_id, _MERIDIAN_NAME)
+    versions = await _profile_versions(session, ctx.tenant_id, _MERIDIAN_ID)
     assert len(versions) == 1
     assert versions[0].source == SOURCE_SEED
 
@@ -737,7 +743,7 @@ async def test_insufficient_signal_batch_emits_zero_alerts_zero_db_writes(
         session, ctx.tenant_id,
         [_seed_profile(ctx.tenant_id, _IRONCLAD_NAME, appetite_confidence="medium")],
     )
-    v1 = await CarrierProfileService.get_latest(session, ctx.tenant_id, _IRONCLAD_NAME)
+    v1 = await CarrierProfileService.get_latest(session, ctx.tenant_id, _IRONCLAD_ID)
     assert v1 is not None
 
     with patch(
@@ -755,7 +761,7 @@ async def test_insufficient_signal_batch_emits_zero_alerts_zero_db_writes(
     assert items == [], f"Expected 0 review items, got {len(items)}"
 
     # Profile unchanged: still exactly 1 version (the SEED row).
-    versions = await _profile_versions(session, ctx.tenant_id, _IRONCLAD_NAME)
+    versions = await _profile_versions(session, ctx.tenant_id, _IRONCLAD_ID)
     assert len(versions) == 1
     assert versions[0].version_id == v1.version_id
     assert versions[0].source == SOURCE_SEED
@@ -782,7 +788,10 @@ async def test_multi_carrier_batch_dispatches_independently(
     session.add(_make_qc_row(ctx.tenant_id, _IRONCLAD_NAME, _IRONCLAD_SIGNALS))  # → INSUFFICIENT_SIGNAL
     await session.commit()
 
-    # Seed profiles for all three.
+    # Seed profiles for all three. carrier_id must match the bundled JSON
+    # panel ids (load_carrier_panel now falls back to the repo-bundled panel
+    # even without TEST_DATA_ROOT, so discover_live_carriers resolves names
+    # to CAR-xx ids).
     await CarrierProfileService.seed_from_json(
         session, ctx.tenant_id,
         [
@@ -807,15 +816,15 @@ async def test_multi_carrier_batch_dispatches_independently(
     assert len(alerts) == 2, f"Expected exactly 2 alerts, got {len(alerts)}: {[a.alert_type for a in alerts]}"
 
     # Coastal: has a CI version.
-    coastal_v, _ = await CarrierProfileService.get_with_history(session, ctx.tenant_id, _COASTAL_NAME)
+    coastal_v, _ = await CarrierProfileService.get_with_history(session, ctx.tenant_id, _COASTAL_ID)
     assert coastal_v is not None and coastal_v.source == SOURCE_CI
 
     # Meridian: still 1 version (SEED), has a ReviewItem.
-    meridian_v, _ = await CarrierProfileService.get_with_history(session, ctx.tenant_id, _MERIDIAN_NAME)
+    meridian_v, _ = await CarrierProfileService.get_with_history(session, ctx.tenant_id, _MERIDIAN_ID)
     assert meridian_v is not None and meridian_v.source == SOURCE_SEED
     meridian_items = await _review_items(session, ctx.tenant_id, "carrier_appetite_intelligence")
     assert len(meridian_items) == 1
 
     # Ironclad: still 1 version (SEED), no ReviewItem.
-    ironclad_v, _ = await CarrierProfileService.get_with_history(session, ctx.tenant_id, _IRONCLAD_NAME)
+    ironclad_v, _ = await CarrierProfileService.get_with_history(session, ctx.tenant_id, _IRONCLAD_ID)
     assert ironclad_v is not None and ironclad_v.source == SOURCE_SEED
