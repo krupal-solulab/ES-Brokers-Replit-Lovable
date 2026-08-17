@@ -1,0 +1,59 @@
+Fix the fixture/mock data path resolution — it currently never actually finds any data, and 
+the dataset location has also moved. The GitHub test-data path is now:
+
+  BE-ES-Brokers/Mock-Data-ES-Broker
+    Workflow 1  -> market_matching_dataset
+    Workflow 2  -> package_assembly_dataset
+    Workflow 3  -> retail_comm_dataset
+    Workflow 4  -> quote_comparison_dataset
+    Workflow 5  -> binder_issuance_dataset
+    Workflow 6  -> endorsement_dataset
+    Workflow 7  -> renewal_remarketing_dataset
+    Workflow 8  -> diligent_search_dataset
+    Workflow 9  -> carrier_intelligence_dataset
+    Workflow 10 -> pipeline_reporting_dataset
+
+  (folder names use a literal space, e.g. "Workflow 1", not "Workflow_1")
+
+The single shared resolver every workflow's fixture loading goes through is 
+`dataset_dir(n)` in src/fixtures/loader.py. Every per-workflow scenario_loader.py 
+(package_assembly, binder_issuance, quote_comparison, endorsement, renewal_remarketing, 
+diligent_search, carrier_appetite_intelligence, pipeline_reporting) imports `dataset_dir` 
+from this one file — so fix it there once, not per-workflow.
+
+Two bugs to fix in src/fixtures/loader.py:
+
+1. `BUNDLED_DATA_ROOT` currently points at `Path(__file__).resolve().parents[2] / "Data sets"` 
+   — update it to point at the new `Mock-Data-ES-Broker` folder instead (same 
+   parents[2]-relative pattern, just the new folder name). Confirm whether the old 
+   "Data sets" folder still exists in the repo — if "Mock-Data-ES-Broker" is now the sole 
+   source of truth, don't delete "Data sets" yourself; just stop reading from it and flag it 
+   to me so I can remove it.
+
+2. `dataset_dir(n)` currently builds the path as `root / f"Workflow_{n}" / "test_dataset"` — 
+   this never matched the real on-disk structure even before the rename (real folders use a 
+   space — "Workflow 1" — and a workflow-specific dataset name — "market_matching_dataset" — 
+   not the generic "test_dataset"). Replace this with a mapping from workflow number to its 
+   real dataset folder name, using the table above, and build the path as 
+   `root / f"Workflow {n}" / dataset_name_for(n)`. Keep the existing behavior otherwise 
+   (TEST_DATA_ROOT still tried first if configured, bundled root as fallback, return None + 
+   warn if neither has it — don't change that contract, callers like scenario_loader.py rely 
+   on it).
+
+After fixing the root + naming, verify each workflow's dataset actually loads:
+- Workflow 1 (market_matching_dataset) uses `submission_01`.."submission_06" — confirm 
+  `load_workflow()`'s `dataset.glob("submission_*")` still finds these under the new path.
+- Workflow 3 (retail_comm_dataset) uses `trigger_01`.."trigger_06", not `scenario_*` — confirm 
+  whichever loader owns Workflow 3 (check for a trigger_loader.py under 
+  src/verticals/es/workflows/agent_communication/) globs `trigger_*`, not `scenario_*`.
+- All other workflows (2, 4-10) use `scenario_01`.."scenario_0N" — confirm each workflow's own 
+  `list_scenario_refs()`/equivalent still finds them via `dataset_dir(n)` after the fix.
+
+Also update docs/DATA_AND_FIXTURES.md wherever it references "Data sets" or 
+"Workflow_<n>/test_dataset" so the documented path matches the actual fixed resolver.
+
+Test: with CONNECTORS_MODE=mock and no connectors connected, run each of the 10 workflows 
+end to end (or at minimum call each workflow's scenario/fixture loader directly) and confirm 
+real submission/scenario/trigger data now loads — not an empty list with a "dataset not 
+found" warning in the logs. Report which workflows loaded correctly and which (if any) still 
+fail, with the exact path each one tried.
