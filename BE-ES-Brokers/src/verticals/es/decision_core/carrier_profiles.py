@@ -18,11 +18,11 @@ log = logging.getLogger(__name__)
 
 # Carrier-profile JSON files shipped with the repo — used when TEST_DATA_ROOT
 # is absent (dev after a DB reset, CI without fixture mounts, etc.).
-# Path: <repo_root>/Data sets/Workflow_10/test_dataset/carrier_profiles/
+# Path: <repo_root>/Mock-Data-ES-Broker/Workflow 1/market_matching_dataset/carrier_profiles/
 # __file__ = src/verticals/es/decision_core/carrier_profiles.py  → parents[4] = repo root
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _BUNDLED_CARRIER_DIR = (
-    _REPO_ROOT / "Data sets" / "Workflow_10" / "test_dataset" / "carrier_profiles"
+    _REPO_ROOT / "Mock-Data-ES-Broker" / "Workflow 1" / "market_matching_dataset" / "carrier_profiles"
 )
 
 
@@ -101,7 +101,7 @@ def _locate_carrier_panel_dir(n: int) -> Path | None:
 
     Priority:
     1. ``TEST_DATA_ROOT/Workflow_{n}/test_dataset/carrier_profiles/``
-    2. Repo-bundled ``Data sets/Workflow_10/test_dataset/carrier_profiles/``
+    2. Repo-bundled ``Mock-Data-ES-Broker/Workflow 1/market_matching_dataset/carrier_profiles/``
        (always present in the repo; no env var needed).
 
     Returns ``None`` (with a warning) only when neither path exists.

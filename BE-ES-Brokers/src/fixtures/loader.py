@@ -43,33 +43,59 @@ class LoadedSubmission:
     documents: list[Document] = field(default_factory=list)
 
 
-# Repo-bundled datasets: BE-ES-Brokers/Data sets/Workflow_<n>/test_dataset.
+# Repo-bundled datasets: BE-ES-Brokers/Mock-Data-ES-Broker/Workflow <k>/<name>_dataset.
 # This makes fixture loading work out of the box in any environment (no
 # machine-specific TEST_DATA_ROOT needed); TEST_DATA_ROOT, when set, still
 # wins so an external dataset can override the bundled one.
-BUNDLED_DATA_ROOT = Path(__file__).resolve().parents[2] / "Data sets"
+BUNDLED_DATA_ROOT = Path(__file__).resolve().parents[2] / "Mock-Data-ES-Broker"
+
+# On-disk folders are numbered 1..10 (with a literal space: "Workflow 1") while
+# the code numbers the E&S workflows 10..19 — folder number = code number − 9.
+# Each folder holds a workflow-specific dataset name, not a generic one.
+_DATASET_FOLDER_NAMES: dict[int, str] = {
+    1: "market_matching_dataset",
+    2: "package_assembly_dataset",
+    3: "retail_comm_dataset",
+    4: "quote_comparison_dataset",
+    5: "binder_issuance_dataset",
+    6: "endorsement_dataset",
+    7: "renewal_remarketing_dataset",
+    8: "diligent_search_dataset",
+    9: "carrier_intelligence_dataset",
+    10: "pipeline_reporting_dataset",
+}
+
+
+def _bundled_candidate(n: int) -> Path | None:
+    k = n - 9  # code workflow number -> on-disk folder number
+    name = _DATASET_FOLDER_NAMES.get(k)
+    if name is None:
+        return None
+    return BUNDLED_DATA_ROOT / f"Workflow {k}" / name
 
 
 def dataset_dir(n: int) -> Path | None:
-    """Resolve ``Workflow_<n>/test_dataset`` for any fixture loader.
+    """Resolve workflow ``n``'s fixture dataset directory for any loader.
 
-    Tries ``TEST_DATA_ROOT`` first (if configured), then falls back to the
-    repo-bundled ``Data sets`` folder. Returns None (warned) when neither has
-    the workflow's dataset — callers treat that as "no fixtures".
+    Tries ``TEST_DATA_ROOT`` first (if configured, using the legacy
+    ``Workflow_<n>/test_dataset`` layout), then falls back to the repo-bundled
+    ``Mock-Data-ES-Broker`` folder. Returns None (warned) when neither has the
+    workflow's dataset — callers treat that as "no fixtures".
     """
-    roots: list[Path] = []
+    candidates: list[Path] = []
     configured = get_settings().test_data_root
     if configured:
-        roots.append(Path(configured))
-    roots.append(BUNDLED_DATA_ROOT)
-    for root in roots:
-        dataset = root / f"Workflow_{n}" / "test_dataset"
+        candidates.append(Path(configured) / f"Workflow_{n}" / "test_dataset")
+    bundled = _bundled_candidate(n)
+    if bundled is not None:
+        candidates.append(bundled)
+    for dataset in candidates:
         if dataset.is_dir():
             return dataset
     log.warning(
-        "Fixture dataset Workflow_%d/test_dataset not found under %s; returning no fixtures.",
+        "Fixture dataset for workflow %d not found (tried: %s); returning no fixtures.",
         n,
-        " or ".join(str(r) for r in roots),
+        ", ".join(str(c) for c in candidates) or "no candidate paths",
     )
     return None
 

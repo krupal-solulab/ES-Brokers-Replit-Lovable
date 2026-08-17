@@ -3,12 +3,26 @@
 Every workflow ships with a **test dataset** and its **validation rules** in the same place. Devs run their workflow against these fixtures — they are the source of truth for "does it work."
 
 ## Location convention
-Datasets are bundled in the repo at `BE-ES-Brokers/Data sets/` and loaded from
-there by default — no environment configuration needed. Setting `TEST_DATA_ROOT`
-(optional) points the loaders at an external copy instead; the bundled folder
+Datasets are bundled in the repo at `BE-ES-Brokers/Mock-Data-ES-Broker/` and
+loaded from there by default — no environment configuration needed. On-disk
+folders are numbered 1..10 with a literal space and a workflow-specific dataset
+name; the code's workflow numbers are 10..19 (folder number = code number − 9).
+Setting `TEST_DATA_ROOT` (optional) points the loaders at an external copy in
+the legacy `Workflow_<N>/test_dataset` layout instead; the bundled folder
 remains the fallback.
 ```
-<repo>/BE-ES-Brokers/Data sets/      # bundled default (TEST_DATA_ROOT overrides)
+<repo>/BE-ES-Brokers/Mock-Data-ES-Broker/   # bundled default (TEST_DATA_ROOT overrides)
+  Workflow 1/market_matching_dataset/       # code workflow 10 (+ carrier_profiles/)
+  Workflow 2/package_assembly_dataset/      # 11
+  Workflow 3/retail_comm_dataset/           # 12 (trigger_* cases)
+  Workflow 4/quote_comparison_dataset/      # 13
+  Workflow 5/binder_issuance_dataset/       # 14
+  Workflow 6/endorsement_dataset/           # 15
+  Workflow 7/renewal_remarketing_dataset/   # 16
+  Workflow 8/diligent_search_dataset/       # 17
+  Workflow 9/carrier_intelligence_dataset/  # 18
+  Workflow 10/pipeline_reporting_dataset/   # 19
+# legacy external layout (TEST_DATA_ROOT only):
   Workflow_<N>/test_dataset/
     README.md                          # what the dataset covers
     Validation_Rules_Test_Dataset.md   # the rules + expected outcomes for this workflow
@@ -235,7 +249,7 @@ in this fixture-driven codebase has produced real "Q3 2027" activity to
 query against.
 
 ## How the loader works (`src/fixtures/loader.py`)
-- `dataset_dir(n)` resolves `Workflow_<n>/test_dataset` under `TEST_DATA_ROOT` (if set), falling back to the repo-bundled `BE-ES-Brokers/Data sets/`. All workflow scenario/trigger loaders share this resolver.
+- `dataset_dir(n)` tries `TEST_DATA_ROOT/Workflow_<n>/test_dataset` (if set), then the repo-bundled `BE-ES-Brokers/Mock-Data-ES-Broker/Workflow <n-9>/<name>_dataset`. All workflow scenario/trigger loaders share this resolver.
 - `load_workflow(n)` → scans `Workflow_<n>/test_dataset/submission_*`, turns each folder into a `Submission` + `list[Document]` (one `Document` per `.txt`, `kind` inferred from filename: `acord_application`→ACORD, `loss_run`→Loss Run, `financial_statement`→Financials, `email`→Email).
 - `load_rules(n)` → reads `Validation_Rules_Test_Dataset.md` (and any `rules.json`) so tests can assert expected pass/fail + recommendation.
 - Used by: **dev seed script** (populate a local DB to click through the FE) and **workflow eval tests** (pytest).
@@ -250,6 +264,6 @@ query against.
 
 ## `.env`
 ```
-# Optional — leave unset to use the repo-bundled "BE-ES-Brokers/Data sets" folder.
+# Optional — leave unset to use the repo-bundled "BE-ES-Brokers/Mock-Data-ES-Broker" folder.
 TEST_DATA_ROOT=
 ```
