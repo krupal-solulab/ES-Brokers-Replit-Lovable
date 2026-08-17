@@ -1,0 +1,34 @@
+Add automated tests for the five Market Matching QA fixes. Put backend tests in
+tests/test_es_market_matching.py and run the whole file plus the existing suite.
+
+FIRST — regression gate: all existing market_matching tests must still pass (they prove
+the ranking/exclusion engine was NOT changed by the fixes). Report if any changed.
+
+NEW TESTS:
+
+Test 3 — grounded recommendation (fix #3):
+- For the Briarcliff/Submission-01 case (PROCEED), assert the recommendation references
+  ONLY carrier names that appear in the engine's matches/excluded output, and every
+  reason string it gives maps to a real engine field (score component, a `missing` item,
+  a `flags` item, or an `excluded.rule`/`reason`). Assert it introduces NO carrier,
+  number, or reason absent from the engine output, and does not restate the numeric score.
+- For the zero-match case (Submission-06, DECLINE), assert the recommendation explicitly
+  says there is no carrier to recommend — never a "best available" pick.
+
+Test 4 — send hands off to Package Assembly (fix #4, FR-13):
+- Run market matching for a submission, select 2 surviving carriers, call /send as a
+  senior role. Assert: a Package Assembly input/record is created for that submission
+  containing EXACTLY those 2 carriers (no more, no fewer), and an audit row is written
+  (user, submission, carriers). Assert /send with zero carriers selected is rejected.
+- Assert /send does NOT send any email to a carrier (no outbound message created).
+
+Test 5 — override really overrides + issue removed (fix #5):
+- Take a HARD-EXCLUDED carrier from a submission's `excluded` list. Call /override as a
+  senior WITHOUT a reason -> expect 400/validation error. Call it WITH a reason ->
+  assert an audit row records (carrier, overridden rule, reason, user) AND that carrier
+  is now selectable (can be passed to /send). Call /override as a JUNIOR role -> expect
+  403 (senior/admin only).
+- Assert the /issue endpoint no longer exists for market matching (expect 404/removed),
+  since "issue" is not a Market Matching concept.
+
+REPORT: total pass/fail, and confirm the existing engine tests are unchanged.

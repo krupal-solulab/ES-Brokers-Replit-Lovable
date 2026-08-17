@@ -213,7 +213,7 @@ async def test_score_components_and_outcome_codes(es_session, es_ctx) -> None:
         submission_id="synthetic-blank-acord",
         documents=[
             RawDocument(
-                kind=DocumentKind.ACORD_125, filename="acord.txt",
+                kind=DocumentKind.ACORD, filename="acord.txt",
                 content="Named Insured: Test Co\n",
             )
         ],
@@ -329,3 +329,208 @@ async def test_list_live_inbox_428_when_gmail_not_connected(monkeypatch, es_ctx,
     with pytest.raises(HTTPException) as exc_info:
         await mm_router.list_live_inbox(es_ctx, es_session)
     assert exc_info.value.status_code == 428
+
+
+# ---------------------------------------------------------------------------
+# QA-fix regression tests (fixes #3/#4/#5): grounded recommendation, real Send
+# handoff to Package Assembly, exclusion override, and removed endpoints.
+# ---------------------------------------------------------------------------
+
+from fastapi import HTTPException  # noqa: E402
+
+from verticals.es.workflows.market_matching.router import (  # noqa: E402
+    OverrideExclusionRequest,
+    override_exclusion,
+    router as _mm_router_obj,
+)
+from verticals.es.workflows.package_assembly.router import (  # noqa: E402
+    RunFromMarketMatchingRequest,
+    run_package_assembly_from_market_matching,
+)
+
+
+@pytest.fixture
+def es_senior_ctx() -> Ctx:
+    return Ctx(tenant_id="demo-es", vertical=Vertical.ES, user_id="u-sr", role=Role.SENIOR)
+
+
+def _grounded_recommendation(payload: dict) -> dict[str, list[str]]:
+    """Mirror of the FE's deterministic recommendation builder — lines composed
+    ONLY from recorded engine fields; used to assert the grounding contract."""
+    approach, hold = [], []
+    for m in payload["matches"]:
+        if m.get("overridden"):
+            continue
+        if m["missing"]:
+            hold.append(f"Hold {m['carrier_name']} pending: {'; '.join(m['missing'])}")
+            continue
+        comps = m.get("score_components") or {}
+        drivers = [k for k, _ in sorted(comps.items(), key=lambda kv: -kv[1])[:2]]
+        approach.append(f"Approach {m['carrier_name']} — {', '.join(drivers)}")
+    excluded = [f"{e['carrier_name']} — {e['rule']}: {e['reason']}" for e in payload["excluded"]]
+    return {"approach": approach, "hold": hold, "excluded": excluded}
+
+
+async def test_recommendation_is_grounded_in_engine_output(es_ctx, es_session) -> None:
+    """Fix #3: every carrier/reason in the recommendation maps to a real engine
+    field; nothing invented, and the numeric composite score is never restated."""
+    item = await run_market_matching(RunRequest(submission_ref="submission_01"), es_ctx, es_session)
+    payload = item.payload.model_dump()
+    rec = _grounded_recommendation(payload)
+
+    engine_names = {m["carrier_name"] for m in payload["matches"]} | {
+        e["carrier_name"] for e in payload["excluded"]
+    }
+    all_lines = rec["approach"] + rec["hold"] + rec["excluded"]
+    assert all_lines, "PROCEED case must produce recommendation lines"
+    for line in all_lines:
+        assert any(name in line for name in engine_names), f"ungrounded carrier in: {line}"
+
+    # Reasons map to real engine fields only.
+    component_keys = set()
+    for m in payload["matches"]:
+        component_keys |= set((m.get("score_components") or {}).keys())
+    for line in rec["approach"]:
+        m = next(x for x in payload["matches"] if x["carrier_name"] in line)
+        for token in line.split(" — ", 1)[1].split(", "):
+            assert token in component_keys, f"driver '{token}' is not an engine component"
+        # The composite score itself is never restated in the text.
+        assert str(m["score"]) not in line
+    for line in rec["hold"]:
+        m = next(x for x in payload["matches"] if x["carrier_name"] in line)
+        for item_missing in m["missing"]:
+            assert item_missing in line
+    for line, e in zip(rec["excluded"], payload["excluded"]):
+        assert e["rule"] in line and e["reason"] in line
+
+
+async def test_recommendation_zero_match_never_picks_best_available(es_ctx, es_session) -> None:
+    """Fix #3 (zero-match): DECLINE means an explicit no-carrier statement —
+    the recommendation must have no carrier to approach or hold, ever."""
+    item = await run_market_matching(RunRequest(submission_ref="submission_06"), es_ctx, es_session)
+    payload = item.payload.model_dump()
+    assert payload["outcome"] == "NO_MATCH"
+    rec = _grounded_recommendation(payload)
+    assert rec["approach"] == [] and rec["hold"] == []
+    assert len(rec["excluded"]) == 6  # every carrier, with its recorded rule+reason
+
+
+async def test_send_hands_off_exactly_selected_carriers(es_ctx, es_senior_ctx, es_session) -> None:
+    """Fix #4 (FR-13): senior Send creates Package Assembly inputs for EXACTLY
+    the selected carriers, writes one human audit row, rejects an empty
+    selection, and sends no outbound message to any carrier."""
+    item = await run_market_matching(RunRequest(submission_ref="submission_01"), es_ctx, es_session)
+    surviving = [m["carrier_id"] for m in item.payload.model_dump()["matches"]][:2]
+    assert len(surviving) == 2
+
+    created = await run_package_assembly_from_market_matching(
+        RunFromMarketMatchingRequest(
+            market_matching_review_item_id=item.id, carrier_ids=surviving
+        ),
+        es_senior_ctx, es_session,
+    )
+    assert sorted(i.carrier_id for i in created) == sorted(surviving)  # exactly, no more/fewer
+
+    audit_rows = await DefaultAuditService().query(
+        es_session, es_senior_ctx, {"workflow": "package_assembly"}
+    )
+    handoff = [r for r in audit_rows if r.actor == "human" and "handoff" in r.what]
+    assert len(handoff) == 1
+    assert handoff[0].who == "u-sr"
+    assert handoff[0].detail["submission_id"] == item.submission_id
+    assert handoff[0].detail["carrier_ids"] == surviving
+
+    # No outbound message to a carrier: nothing left the review queue as sent,
+    # and no audit row records an email being sent.
+    sent_items = (
+        await es_session.execute(
+            select(ReviewItemRow).where(col(ReviewItemRow.status) == ReviewStatus.SENT)
+        )
+    ).scalars().all()
+    assert sent_items == []
+    assert not any("email" in r.what.lower() for r in audit_rows)
+
+    # Empty selection rejected.
+    with pytest.raises(HTTPException) as exc:
+        await run_package_assembly_from_market_matching(
+            RunFromMarketMatchingRequest(
+                market_matching_review_item_id=item.id, carrier_ids=[]
+            ),
+            es_senior_ctx, es_session,
+        )
+    assert exc.value.status_code == 422
+
+    # Junior cannot send at all (senior/admin only, server-side).
+    with pytest.raises(HTTPException) as exc:
+        await run_package_assembly_from_market_matching(
+            RunFromMarketMatchingRequest(
+                market_matching_review_item_id=item.id, carrier_ids=surviving
+            ),
+            es_ctx, es_session,
+        )
+    assert exc.value.status_code == 403
+
+
+async def test_override_moves_excluded_carrier_and_is_audited(
+    es_ctx, es_senior_ctx, es_session
+) -> None:
+    """Fix #5: junior override -> 403; senior without reason -> 422; with a
+    reason the carrier moves into the shortlist (no engine score), an audit row
+    records carrier/rule/reason/user, and the carrier is now sendable."""
+    item = await run_market_matching(RunRequest(submission_ref="submission_02"), es_ctx, es_session)
+    excluded = item.payload.model_dump()["excluded"]
+    assert excluded, "submission_02 must have hard-excluded carriers"
+    target = excluded[0]
+
+    with pytest.raises(HTTPException) as exc:
+        await override_exclusion(
+            item.id, OverrideExclusionRequest(carrier_id=target["carrier_id"], reason="x"),
+            es_ctx, es_session,
+        )
+    assert exc.value.status_code == 403
+
+    with pytest.raises(HTTPException) as exc:
+        await override_exclusion(
+            item.id, OverrideExclusionRequest(carrier_id=target["carrier_id"], reason="   "),
+            es_senior_ctx, es_session,
+        )
+    assert exc.value.status_code == 422
+
+    updated = await override_exclusion(
+        item.id,
+        OverrideExclusionRequest(carrier_id=target["carrier_id"], reason="manager approved"),
+        es_senior_ctx, es_session,
+    )
+    moved = [m for m in updated.payload.model_dump()["matches"] if m["carrier_id"] == target["carrier_id"]]
+    assert len(moved) == 1
+    assert moved[0]["overridden"] is True
+    assert moved[0]["score"] == 0.0  # no invented engine score
+    assert moved[0]["override_rule"] == target["rule"]
+    assert target["carrier_id"] not in {e["carrier_id"] for e in updated.payload.model_dump()["excluded"]}
+
+    rows = await DefaultAuditService().query(
+        es_session, es_senior_ctx, {"workflow": "market_matching"}
+    )
+    ov = [r for r in rows if r.actor == "human" and "override" in r.what]
+    assert len(ov) == 1
+    assert ov[0].who == "u-sr"
+    assert ov[0].detail["carrier_id"] == target["carrier_id"]
+    assert ov[0].detail["rule_overridden"] == target["rule"]
+    assert ov[0].detail["reason"] == "manager approved"
+
+    # The overridden carrier is now selectable for Send.
+    created = await run_package_assembly_from_market_matching(
+        RunFromMarketMatchingRequest(
+            market_matching_review_item_id=item.id, carrier_ids=[target["carrier_id"]]
+        ),
+        es_senior_ctx, es_session,
+    )
+    assert [i.carrier_id for i in created] == [target["carrier_id"]]
+
+
+def test_send_and_issue_endpoints_removed_from_market_matching() -> None:
+    """Fix #5 (+#4): neither a bare /send status flip nor an /issue endpoint
+    exists on the Market Matching router anymore."""
+    paths = {r.path for r in _mm_router_obj.routes}
+    assert not any(p.endswith("/send") for p in paths)
+    assert not any(p.endswith("/issue") for p in paths)
