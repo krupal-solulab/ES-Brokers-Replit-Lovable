@@ -1,6 +1,6 @@
 """E&S Binder & Policy Issuance Coordination eval test — proves the pipeline
 + router against the REAL Workflow_14 dataset (originally
-``Data sets/Workflow 5/binder_issuance_dataset``, copied to
+``Data sets/Workflow_14/test_dataset``, copied to
 ``TEST_DATA_ROOT/Workflow_14/test_dataset`` per DATA_AND_FIXTURES.md; see
 that file's Workflow_14 layout note for the mixed pre-bind/post-issuance
 fixture shape).
@@ -16,6 +16,8 @@ from datetime import date
 
 import httpx
 import pytest
+
+from fixtures.loader import dataset_dir as _bundled_dataset_dir
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
@@ -57,8 +59,8 @@ from verticals.es.workflows.quote_comparison.router import (
 )
 
 pytestmark = pytest.mark.skipif(
-    not get_settings().test_data_root,
-    reason="TEST_DATA_ROOT not set; real Workflow_14 fixtures unavailable",
+    _bundled_dataset_dir(14) is None,
+    reason="Workflow_14 fixture dataset not found (TEST_DATA_ROOT or bundled Data sets)",
 )
 
 

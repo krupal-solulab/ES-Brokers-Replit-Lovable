@@ -1,6 +1,6 @@
 """E&S Quote Comparison eval test — proves the pipeline + router against the
 REAL Workflow_13 dataset (originally
-``Data sets/Workflow 4/quote_comparison_dataset``, copied to
+``Data sets/Workflow_13/test_dataset``, copied to
 ``TEST_DATA_ROOT/Workflow_13/test_dataset`` per DATA_AND_FIXTURES.md; see
 that file's Workflow_13 layout note for the raw-email fixture shape and the
 "as of" reference-date convention each test below supplies explicitly).
@@ -16,6 +16,8 @@ from datetime import date
 
 import httpx
 import pytest
+
+from fixtures.loader import dataset_dir as _bundled_dataset_dir
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 
@@ -47,8 +49,8 @@ from verticals.es.workflows.quote_comparison.router import (
 from verticals.es.workflows.quote_comparison.service import QuoteComparisonPipeline
 
 pytestmark = pytest.mark.skipif(
-    not get_settings().test_data_root,
-    reason="TEST_DATA_ROOT not set; real Workflow_13 fixtures unavailable",
+    _bundled_dataset_dir(13) is None,
+    reason="Workflow_13 fixture dataset not found (TEST_DATA_ROOT or bundled Data sets)",
 )
 
 

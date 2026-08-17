@@ -1,6 +1,6 @@
 """E&S Retail Agent Communication eval test — proves the pipeline + router
 against the REAL Workflow_12 dataset (originally
-``Data sets/Workflow 3/retail_comm_dataset``, copied to
+``Data sets/Workflow_12/test_dataset``, copied to
 ``TEST_DATA_ROOT/Workflow_12/test_dataset`` per DATA_AND_FIXTURES.md; see that
 file's Workflow_12 layout note). ``expected_draft.txt``/``tone_notes.txt`` are
 illustrative reference material for a human reviewer, not literal strings
@@ -16,6 +16,8 @@ verticals/es/workflows/agent_communication/eval_test.py for why.
 from __future__ import annotations
 
 import pytest
+
+from fixtures.loader import dataset_dir as _bundled_dataset_dir
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel, col, select
@@ -49,8 +51,8 @@ from verticals.es.workflows.agent_communication.trigger_loader import load_trigg
 # Applied individually to tests that load Workflow_12 fixture files.
 # Edit-endpoint tests create DB rows directly and always run.
 _needs_fixtures = pytest.mark.skipif(
-    not get_settings().test_data_root,
-    reason="TEST_DATA_ROOT not set; real Workflow_12 fixtures unavailable",
+    _bundled_dataset_dir(12) is None,
+    reason="Workflow_12 fixture dataset not found (TEST_DATA_ROOT or bundled Data sets)",
 )
 
 # ── edit-distance test constants ─────────────────────────────────────────────

@@ -52,10 +52,17 @@ def _is_quota_error(exc: Exception) -> bool:
     the product-wide static-data fallback (core.data_mode reason c). A plain
     429 rate limit (retryable, not a billing problem) does NOT qualify."""
     text = str(exc)
-    if "insufficient_quota" in text or "exceeded your current quota" in text:
+    if (
+        "insufficient_quota" in text
+        or "exceeded your current quota" in text
+        or "billing_hard_limit_reached" in text
+    ):
         return True
     code = getattr(exc, "code", None)
-    return code == "insufficient_quota"
+    if code in ("insufficient_quota", "billing_hard_limit_reached"):
+        return True
+    # HTTP 402 Payment Required — unambiguous billing failure.
+    return getattr(exc, "status_code", None) == 402
 
 
 class OpenAIProvider:

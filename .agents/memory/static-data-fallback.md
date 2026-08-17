@@ -12,5 +12,6 @@ Rule: one shared resolver (`core/data_mode.py`) decides live vs static (reasons:
 - Writeback/outbound connector methods (send_email, put_file, upload_file, append_rows, create_event, send_slack_message) are deliberately EXCLUDED from the fallback — they still raise ConnectorNotConnectedError so routers report "skipped — not connected" instead of pretending a real write happened.
 - Live-ingestion helpers that truly need the live service must use `unwrap_live_connector()` (the factory returns a StaticFallbackConnectorService wrapper in live mode, so bare `isinstance(..., LiveNangoConnectorService)` checks break).
 - LLM quota flag: only insufficient_quota/billing errors flip it (plain 429 rate limits do not); process-local with 5-min TTL — a known single-process limitation.
-- Connect/disconnect endpoints must call `invalidate_connection_cache(tenant_id)` (15s per-tenant cache of the Gmail connection check).
+- Connector check covers ALL four registered connectors (mail, sheet, drive, slack) as one combined per-tenant cached answer (15s TTL); ANY missing one flips the whole product static. Connect/disconnect endpoints must call `invalidate_connection_cache(tenant_id)`.
+- Billing signals that flip the quota flag: insufficient_quota, "exceeded your current quota", billing_hard_limit_reached, HTTP 402. No proactive balance polling — OpenAI exposes no billing/credit API to standard keys, so detection stays reactive.
 - FE banner lives in AppShell (`StaticDataBanner`, polls GET /api/core/app-config/data-mode every 30s).

@@ -19,16 +19,7 @@ from core.config import get_settings
 log = logging.getLogger(__name__)
 
 
-def _dataset_dir(n: int) -> Path | None:
-    root = get_settings().test_data_root
-    if not root:
-        log.warning("TEST_DATA_ROOT is not set; returning no scenarios.")
-        return None
-    dataset = Path(root) / f"Workflow_{n}" / "test_dataset"
-    if not dataset.is_dir():
-        log.warning("Fixture dataset not found at %s; returning no scenarios.", dataset)
-        return None
-    return dataset
+from fixtures.loader import dataset_dir as _dataset_dir  # shared resolver (bundled fallback)
 
 
 def list_scenario_refs(n: int) -> list[str]:

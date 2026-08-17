@@ -3,9 +3,13 @@
 Every workflow ships with a **test dataset** and its **validation rules** in the same place. Devs run their workflow against these fixtures — they are the source of truth for "does it work."
 
 ## Location convention
+Datasets are bundled in the repo at `BE-ES-Brokers/Data sets/` and loaded from
+there by default — no environment configuration needed. Setting `TEST_DATA_ROOT`
+(optional) points the loaders at an external copy instead; the bundled folder
+remains the fallback.
 ```
-TEST_DATA_ROOT = D:\INDUSTRY AI OS bac\test data
-  Workflow_<N>\test_dataset\
+<repo>/BE-ES-Brokers/Data sets/      # bundled default (TEST_DATA_ROOT overrides)
+  Workflow_<N>/test_dataset/
     README.md                          # what the dataset covers
     Validation_Rules_Test_Dataset.md   # the rules + expected outcomes for this workflow
     submission_01\ … submission_10\    # one folder per sample case
@@ -231,7 +235,7 @@ in this fixture-driven codebase has produced real "Q3 2027" activity to
 query against.
 
 ## How the loader works (`src/fixtures/loader.py`)
-- Reads `TEST_DATA_ROOT` from `.env`.
+- `dataset_dir(n)` resolves `Workflow_<n>/test_dataset` under `TEST_DATA_ROOT` (if set), falling back to the repo-bundled `BE-ES-Brokers/Data sets/`. All workflow scenario/trigger loaders share this resolver.
 - `load_workflow(n)` → scans `Workflow_<n>/test_dataset/submission_*`, turns each folder into a `Submission` + `list[Document]` (one `Document` per `.txt`, `kind` inferred from filename: `acord_application`→ACORD, `loss_run`→Loss Run, `financial_statement`→Financials, `email`→Email).
 - `load_rules(n)` → reads `Validation_Rules_Test_Dataset.md` (and any `rules.json`) so tests can assert expected pass/fail + recommendation.
 - Used by: **dev seed script** (populate a local DB to click through the FE) and **workflow eval tests** (pytest).
@@ -246,5 +250,6 @@ query against.
 
 ## `.env`
 ```
-TEST_DATA_ROOT="D:\INDUSTRY AI OS bac\test data"
+# Optional — leave unset to use the repo-bundled "BE-ES-Brokers/Data sets" folder.
+TEST_DATA_ROOT=
 ```

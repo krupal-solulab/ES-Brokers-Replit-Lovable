@@ -13,9 +13,10 @@ Triggers (checked in order):
 2. ``llm_insufficient_quota`` — a live OpenAI call recently failed with an
    insufficient_quota / 429 billing error (short-lived process-local flag set
    by ``core.llm.service``; TTL below).
-3. ``connector_disconnected`` — connectors_mode is "live" but the tenant has
-   no active Gmail/Nango connection (the one connector every ingest path
-   needs). Live mode with everything connected resolves to ``live``.
+3. ``connector_disconnected`` — connectors_mode is "live" but ANY of the
+   registered ingest/writeback connectors (mail, sheets, drive, slack) has no
+   active Nango connection. Live mode with everything connected resolves to
+   ``live``.
 """
 
 from __future__ import annotations
@@ -112,7 +113,10 @@ async def resolve_data_mode(session: AsyncSession, tenant_id: str) -> DataMode:
     if sync_answer is not None:
         return sync_answer
 
-    # (b) live mode, but is the connector every ingest path needs connected?
+    # (b) live mode, but are ALL connectors the ingest/writeback paths use
+    # connected? Any missing one flips the whole product to static — a single
+    # combined answer is cached per tenant (never per-connector) so the mode
+    # can never disagree between connectors within the TTL.
     cached = _conn_check_cache.get(tenant_id)
     now = time.monotonic()
     if cached is not None and now - cached[0] <= _CONN_CHECK_TTL_SECONDS:
@@ -120,11 +124,19 @@ async def resolve_data_mode(session: AsyncSession, tenant_id: str) -> DataMode:
     else:
         from core.integrations.repository import get_connection  # avoids import cycle
 
-        provider = get_settings().nango_integration_mail
-        conn = await get_connection(session, tenant_id, provider)
-        connected = bool(
-            conn is not None and conn.status == "connected" and conn.nango_connection_id
+        settings = get_settings()
+        providers = (
+            settings.nango_integration_mail,
+            settings.nango_integration_sheet,
+            settings.nango_integration_drive,
+            settings.nango_integration_slack,
         )
+        connected = True
+        for provider in providers:
+            conn = await get_connection(session, tenant_id, provider)
+            if not (conn is not None and conn.status == "connected" and conn.nango_connection_id):
+                connected = False
+                break
         _conn_check_cache[tenant_id] = (now, connected)
     if not connected:
         return DataMode("static", "connector_disconnected")

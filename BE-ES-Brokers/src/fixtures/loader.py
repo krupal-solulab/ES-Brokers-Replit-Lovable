@@ -43,16 +43,39 @@ class LoadedSubmission:
     documents: list[Document] = field(default_factory=list)
 
 
-def _dataset_dir(n: int) -> Path | None:
-    root = get_settings().test_data_root
-    if not root:
-        log.warning("TEST_DATA_ROOT is not set; returning no fixtures.")
-        return None
-    dataset = Path(root) / f"Workflow_{n}" / "test_dataset"
-    if not dataset.is_dir():
-        log.warning("Fixture dataset not found at %s; returning no fixtures.", dataset)
-        return None
-    return dataset
+# Repo-bundled datasets: BE-ES-Brokers/Data sets/Workflow_<n>/test_dataset.
+# This makes fixture loading work out of the box in any environment (no
+# machine-specific TEST_DATA_ROOT needed); TEST_DATA_ROOT, when set, still
+# wins so an external dataset can override the bundled one.
+BUNDLED_DATA_ROOT = Path(__file__).resolve().parents[2] / "Data sets"
+
+
+def dataset_dir(n: int) -> Path | None:
+    """Resolve ``Workflow_<n>/test_dataset`` for any fixture loader.
+
+    Tries ``TEST_DATA_ROOT`` first (if configured), then falls back to the
+    repo-bundled ``Data sets`` folder. Returns None (warned) when neither has
+    the workflow's dataset — callers treat that as "no fixtures".
+    """
+    roots: list[Path] = []
+    configured = get_settings().test_data_root
+    if configured:
+        roots.append(Path(configured))
+    roots.append(BUNDLED_DATA_ROOT)
+    for root in roots:
+        dataset = root / f"Workflow_{n}" / "test_dataset"
+        if dataset.is_dir():
+            return dataset
+    log.warning(
+        "Fixture dataset Workflow_%d/test_dataset not found under %s; returning no fixtures.",
+        n,
+        " or ".join(str(r) for r in roots),
+    )
+    return None
+
+
+# Backwards-compatible private alias (older loaders/tests referenced this name).
+_dataset_dir = dataset_dir
 
 
 def load_workflow(

@@ -66,31 +66,51 @@ async def test_live_but_disconnected_resolves_static(session, monkeypatch) -> No
     )
 
 
+def _all_providers() -> list[str]:
+    s = get_settings()
+    return [
+        s.nango_integration_mail,
+        s.nango_integration_sheet,
+        s.nango_integration_drive,
+        s.nango_integration_slack,
+    ]
+
+
+async def _connect_providers(session, providers) -> None:
+    for i, provider in enumerate(providers):
+        session.add(
+            Connection(
+                tenant_id="demo-es",
+                provider=provider,
+                status="connected",
+                nango_connection_id=f"nc-{i}",
+            )
+        )
+    await session.commit()
+
+
 async def test_live_and_connected_resolves_live(session, monkeypatch) -> None:
     monkeypatch.setattr(get_settings(), "connectors_mode", "live")
-    session.add(
-        Connection(
-            tenant_id="demo-es",
-            provider=get_settings().nango_integration_mail,
-            status="connected",
-            nango_connection_id="nc-1",
-        )
-    )
-    await session.commit()
+    await _connect_providers(session, _all_providers())
     assert await resolve_data_mode(session, "demo-es") == DataMode("live", "")
+
+
+async def test_live_with_one_nonmail_connector_missing_resolves_static(
+    session, monkeypatch
+) -> None:
+    """The main widened-check case: Gmail connected but Slack (any registered
+    connector) disconnected must flip the WHOLE product static."""
+    monkeypatch.setattr(get_settings(), "connectors_mode", "live")
+    providers = _all_providers()
+    await _connect_providers(session, providers[:-1])  # everything except slack
+    assert await resolve_data_mode(session, "demo-es") == DataMode(
+        "static", "connector_disconnected"
+    )
 
 
 async def test_llm_quota_flag_wins_even_when_connected(session, monkeypatch) -> None:
     monkeypatch.setattr(get_settings(), "connectors_mode", "live")
-    session.add(
-        Connection(
-            tenant_id="demo-es",
-            provider=get_settings().nango_integration_mail,
-            status="connected",
-            nango_connection_id="nc-1",
-        )
-    )
-    await session.commit()
+    await _connect_providers(session, _all_providers())
     note_llm_quota_error()
     assert await resolve_data_mode(session, "demo-es") == DataMode(
         "static", "llm_insufficient_quota"
@@ -216,3 +236,24 @@ async def test_data_mode_endpoint(session, monkeypatch) -> None:
     monkeypatch.setattr(get_settings(), "connectors_mode", "live")
     out = await get_data_mode(ctx, session)
     assert out.mode == "static" and out.reason == "connector_disconnected"
+
+
+# --- broadened billing-error detection -------------------------------------------
+
+
+def test_is_quota_error_broadened_signals() -> None:
+    from core.llm.service import _is_quota_error
+
+    class Exc402(Exception):
+        status_code = 402
+
+    class ExcCode(Exception):
+        code = "billing_hard_limit_reached"
+
+    assert _is_quota_error(Exception("Error code: 429 - insufficient_quota ..."))
+    assert _is_quota_error(Exception("You exceeded your current quota, please check"))
+    assert _is_quota_error(Exception("billing_hard_limit_reached"))
+    assert _is_quota_error(Exc402("payment required"))
+    assert _is_quota_error(ExcCode("hard limit"))
+    # plain rate limits must NOT flip the product static
+    assert not _is_quota_error(Exception("Error code: 429 - rate_limit_exceeded"))

@@ -1,6 +1,6 @@
 """E&S Pipeline & Carrier Performance Reporting eval test — proves the
 pipeline + router against the REAL Workflow_19 dataset (originally
-``Data sets/Workflow 10/pipeline_reporting_dataset``, copied to
+``Data sets/Workflow_19/test_dataset``, copied to
 ``TEST_DATA_ROOT/Workflow_19/test_dataset`` per DATA_AND_FIXTURES.md).
 
 Pytest-discovered here (not under src/verticals/es/...) — see
@@ -23,6 +23,8 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+
+from fixtures.loader import dataset_dir as _bundled_dataset_dir
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 
@@ -46,8 +48,8 @@ from verticals.es.workflows.pipeline_reporting.service import PipelineReportingP
 # Live-path tests (es_session + synthetic rows) do NOT carry this mark
 # and always run.
 _needs_fixtures = pytest.mark.skipif(
-    not get_settings().test_data_root,
-    reason="TEST_DATA_ROOT not set; real Workflow_19 fixtures unavailable",
+    _bundled_dataset_dir(19) is None,
+    reason="Workflow_19 fixture dataset not found (TEST_DATA_ROOT or bundled Data sets)",
 )
 
 
