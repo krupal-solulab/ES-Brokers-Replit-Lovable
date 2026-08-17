@@ -1,0 +1,10 @@
+# Backend-AI-OS base URL (FastAPI, default dev port 4000)
+VITE_API_BASE_URL="http://localhost:4000"
+
+# Phase-0 header-stub auth stand-in (no login flow yet). Backend resolves
+# tenant -> vertical from the Tenant row, so these three headers are all
+# that's needed. Values below are the seeded E&S demo tenant (see
+# Backend-AI-OS/src/core/seed.py) — this screen only talks to /api/es/*.
+VITE_DEMO_TENANT_ID="demo-es"
+VITE_DEMO_USER_ID="demo-es-junior"
+VITE_DEMO_ROLE="junior"

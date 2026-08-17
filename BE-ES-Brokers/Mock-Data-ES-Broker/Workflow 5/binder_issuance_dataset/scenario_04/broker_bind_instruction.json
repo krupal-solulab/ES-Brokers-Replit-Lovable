@@ -1,0 +1,18 @@
+{
+  "submission_id": "SUB-3304",
+  "named_insured": "Summit Roofing Group LLC",
+  "carrier_id": "CAR-03",
+  "carrier_name": "Ironclad Casualty Solutions",
+  "selected_quote_id": "Q-9904",
+  "bind_terms_requested": {
+    "premium": 118000,
+    "limits": "General Liability $1,000,000/$2,000,000 aggregate",
+    "effective_date": "2027-08-01",
+    "deductible": 5000
+  },
+  "subjectivities_at_selection": [
+    {"description": "signed application", "materiality": "routine", "status": "cleared"},
+    {"description": "updated loss control report within 60 days of binding", "materiality": "material", "lifecycle_stage": "POST_BIND_ONGOING", "status": "not yet due - binding occurring now"},
+    {"description": "no new claims prior to binding", "materiality": "routine", "status": "cleared"}
+  ]
+}

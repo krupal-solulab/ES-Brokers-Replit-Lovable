@@ -1,0 +1,14 @@
+EXPECTED OUTPUT — Ridgeline Amusement Park
+
+State requirement check (DS-01): Texas generally requires diligent
+search for E&S placements.
+Export list check (DS-02): amusement park liability IS on Texas's
+export list - EXEMPTION APPLIES. Diligent search documentation is NOT
+required for this transaction.
+
+STATUS: EXEMPT - no declinations needed, no affidavit required. System
+should clearly log the exemption basis (export list, specific
+citation) for the file, since "no diligent search on file" must be
+distinguishable from "diligent search required but missing" - these
+look identical without an explicit exemption record, and confusing the
+two is a real compliance risk in the other direction.

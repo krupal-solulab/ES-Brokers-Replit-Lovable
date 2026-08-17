@@ -1,0 +1,24 @@
+EXPECTED OUTPUT — Q3 2027 Pipeline Funnel (INCOMPLETE DATA)
+
+Submissions Received: 84
+  -> Matched to Carrier: 79 (94.0%)
+  -> Packages Assembled: 79 (100.0% of matched)
+  -> Quotes Received: 61 (77.2% of packaged)
+  -> Compared & Selected: DATA GAP - 2-week logging gap in August
+     (system migration) - this stage's conversion figure CANNOT be
+     reliably reported for this period
+  -> Bound: 47 (bind stage logging unaffected, so this figure IS
+     reliable, but the funnel step immediately before it should not be
+     silently interpolated to make the chart look complete)
+
+DATA COMPLETENESS: Marked PARTIAL (per PR-06) - the report must
+visually and explicitly flag the gap rather than silently omitting the
+affected stage or filling it with an estimate. Do NOT compute or
+display a "58" figure for compared-and-selected by inferring it from
+adjacent stages - state plainly that this figure is unavailable for
+this period and why.
+
+This is the most important test case in this dataset: a reporting
+workflow's credibility depends entirely on never presenting a gap as if
+it were clean data, and the temptation to smooth over a gap for a
+nicer-looking chart is real and must be resisted.

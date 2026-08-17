@@ -1,0 +1,18 @@
+EXPECTED OUTPUT — Pinecrest Demolition Co. (INSUFFICIENT EVIDENCE)
+
+State requirement check (DS-01): Florida requires diligent search,
+class not exempt (DS-02).
+
+Declination evidence sufficiency (DS-03): only 2 of 3 required
+declinations on file, and one of those two lacks written evidence
+(verbal only) - per DS-03, a verbal decline without written
+confirmation should NOT count toward the requirement, since the
+affidavit must be able to attest to documented evidence, not
+recollection.
+
+STATUS: BLOCKED - cannot generate a compliant diligent search document.
+System must NOT draft an affidavit representing 3 declinations when
+only 1-2 are properly evidenced - this would be generating a
+non-compliant, potentially fraudulent document. Flag specific gap:
+"need 1 more admitted decline with written evidence, and should obtain
+written confirmation for Carrier B's verbal decline if possible."

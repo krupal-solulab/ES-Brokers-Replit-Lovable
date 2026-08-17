@@ -1,0 +1,13 @@
+LOSS RUN REPORT
+Named Insured: Oakwood Apartment Homes LP
+Policy Period Covered: 08/15/2022 - 08/15/2027 (5 years)
+
+Claim 1
+  Date of Loss: 03/11/2024
+  Cause of Loss: Water damage - pipe burst, unit
+  Status: Closed
+  Incurred: $32,000
+
+Summary:
+  Total Incurred (5yr): $32,000
+  Loss Frequency Trend: Flat / Improving

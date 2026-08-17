@@ -1,0 +1,12 @@
+{
+  "submission_id": "SUB-3306",
+  "named_insured": "GreenLeaf Cultivation Facility LLC",
+  "state": "Oregon",
+  "class_code": "cannabis - cultivation",
+  "declinations_on_file": [
+    {"carrier": "Admitted Carrier A", "type": "admitted", "date": "2027-07-10", "written_evidence": true},
+    {"carrier": "Admitted Carrier B", "type": "admitted", "date": "2027-07-11", "written_evidence": true},
+    {"carrier": "Admitted Carrier C", "type": "admitted", "date": "2027-07-12", "written_evidence": true}
+  ],
+  "state_requirement": {"admitted_declinations_required": 3, "export_list_class": false}
+}

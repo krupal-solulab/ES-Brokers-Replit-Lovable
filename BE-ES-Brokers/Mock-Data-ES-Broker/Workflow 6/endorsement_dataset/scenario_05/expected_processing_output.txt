@@ -1,0 +1,27 @@
+EXPECTED PROCESSING OUTPUT — Continental Freight Carriers (DISCREPANCY DETECTED)
+
+Issued endorsement reconciliation against request (per EP-05):
+  Requested: add BOTH Midstate Distribution Co. AND Harborline Logistics
+  Issued: only Midstate Distribution Co. added - HARBORLINE LOGISTICS
+  MISSING from the issued endorsement.
+  Effective date: MATCHES (09/20/2027)
+  Premium: MATCHES (no additional premium, as expected for this type)
+
+STATUS: PARTIAL DISCREPANCY - one of two requested additional insureds
+was not included in the issued endorsement. This is very likely a
+carrier processing oversight (missed the second name in the original
+request), not an intentional exclusion, but per the same principle
+established in Binder & Policy Issuance's BI-05, this must be flagged
+and confirmed, not assumed to be either an error or an intentional
+partial fulfillment.
+
+RECOMMENDATION: Follow up with Vantage Excess Partners to confirm
+whether Harborline Logistics was intentionally omitted or simply missed
+- do NOT forward this endorsement to the retail agent as "request
+completed" until this is resolved, since the retail agent (and
+ultimately Continental Freight's client relationship with Harborline)
+depends on this being accurate.
+
+DOWNSTREAM TRIGGER: endorsement-confirmation communication to retail
+agent HELD until resolved, consistent with the trigger-gating discipline
+established in Binder & Policy Issuance's BI-06.

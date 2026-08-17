@@ -1,0 +1,19 @@
+{
+  "carrier_id": "CAR-03",
+  "carrier_name": "Ironclad Casualty Solutions",
+  "lines_written": ["General Liability", "Excess Casualty"],
+  "class_codes_accepted": ["contractors - electrical", "contractors - plumbing", "contractors - general", "contractors - roofing (all types, steep and low slope)", "trucking - non-hazmat"],
+  "class_codes_excluded": ["habitational", "cannabis", "asbestos abatement"],
+  "states_licensed": ["SC", "NC", "GA", "TN", "VA", "AL", "MS"],
+  "premium_band": {"min": 20000, "max": 500000},
+  "submission_requirements": {
+    "min_loss_run_years": 3,
+    "required_documents": ["ACORD 125", "ACORD 126", "3-year loss run minimum", "current financials"],
+    "acceptance_window_days": 90
+  },
+  "severity_ceiling": {"max_single_claim_incurred": 500000},
+  "appetite_confidence": "high",
+  "appetite_last_updated": "2027-04-20",
+  "historical_hit_rate_this_class": 0.55,
+  "notes": "Higher risk tolerance carrier - accepts steep-slope roofing and higher severity accounts other carriers decline. Rate loaded accordingly."
+}

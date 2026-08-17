@@ -1,0 +1,12 @@
+{
+  "submission_id": "SUB-3305",
+  "named_insured": "Clearpath Bookkeeping Services LLC",
+  "broker_selected_carriers": ["CAR-05"],
+  "carrier_id": "CAR-05",
+  "carrier_name": "Apex Excess Lines",
+  "carrier_requirements": {
+    "required_documents": ["ACORD 125", "ACORD 126", "3-year loss run", "current financials"],
+    "min_loss_run_years": 3
+  },
+  "documents_available_from_extraction": ["ACORD 125", "ACORD 126", "3-year loss run", "internal financial summary"]
+}

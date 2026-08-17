@@ -1,0 +1,38 @@
+EXPECTED REMARKET DECISION — Oakwood Apartment Homes
+
+Exposure change detection (per RR-01): Revenue +32.5%, but ENTIRELY
+attributable to the already-endorsed Willowbrook Commons location
+addition (per Endorsement Processing's Scenario 04, same account) - this
+is not new information, it's a known, already-priced exposure increase.
+
+Loss history change detection (per RR-02): FAVORABLE. No new claims, and
+the one historical claim is now 4+ years old with no recurrence -
+improving trend.
+
+Incumbent appetite recheck (per RR-03): Incumbent proactive, 66 days
+ahead of expiration - strong appetite signal.
+
+Renewal terms assessment: +44.8% premium increase looks large in
+isolation, but is explained almost entirely by the +TIV from the
+endorsed location, not a risk-based increase - the underlying rate
+appears roughly consistent with expiring terms once the added location
+is factored out.
+
+Remarket trigger decision (per RR-04): BORDERLINE - LEAN TOWARD LIGHT
+REMARKET CHECK, not full shopping. The premium increase is explained by
+exposure, not adverse experience, so this is NOT the same situation as
+Scenario 02. However, the improving loss trend (claim aging out) plus
+meaningfully larger TIV crossing into a size band where other carriers
+in the panel (larger multi-location specialists) might now be
+competitive is worth a quick comparison check - not because anything
+is wrong with Coastal Mutual's offer, but because favorable change plus
+now-larger size is exactly the profile where a light remarket check has
+genuine expected value, distinct from a full shop.
+
+RECOMMENDED ACTION: Run a LIGHTWEIGHT Market Matching re-check (per
+RR-05) rather than a full active remarket campaign - primarily to
+confirm Coastal Mutual remains competitive at this new size, not
+because there's a specific concern with their offer. This distinction
+(light check vs. full remarket) is the main thing this scenario tests -
+not every "worth a look" situation should trigger the same level of
+broker effort as Scenario 02's clearly-warranted full remarket.

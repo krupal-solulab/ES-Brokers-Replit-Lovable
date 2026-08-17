@@ -1,0 +1,17 @@
+EXPECTED OUTPUT — GreenLeaf Cultivation Facility
+
+State requirement check (DS-01): Oregon requires diligent search
+documentation for E&S placement unless the class is on the export list.
+Class check (DS-02): cannabis cultivation is NOT on Oregon's export
+list - diligent search IS required, no exemption available.
+
+Declination evidence sufficiency (DS-03): 3 of 3 required admitted-
+market declinations on file, each with written evidence. MEETS
+requirement.
+
+Document generation (DS-04): affidavit drafted listing the three
+admitted carriers, dates, and confirming written evidence exists for
+each - every fact grounded to the specific declination record, no
+carrier or date invented.
+
+STATUS: READY - diligent search documentation complete and compliant.

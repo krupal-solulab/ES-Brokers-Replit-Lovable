@@ -1,0 +1,29 @@
+EXPECTED COMPARISON OUTPUT — Oakwood Apartment Homes (Revised Terms)
+
+Comparability: N/A - single quote in this scenario (isolated to test
+subjectivity extraction/flagging specifically)
+
+Subjectivity analysis (per QC-02):
+  (1) Loss control inspection required PRIOR to binding, must be
+      SCHEDULED within 10 days — this is a MATERIAL, timeline-affecting
+      subjectivity, not routine paperwork. Effective date is 08/15;
+      quote issued 07/29. If inspection scheduling doesn't happen
+      within 10 days (by ~08/08) AND the inspection itself must then
+      occur and clear before binding, this creates real risk of missing
+      the 08/15 effective date.
+  (2) SOV confirmation - ROUTINE, low risk to timeline
+  (3) No new claims prior to binding - ROUTINE, standard subjectivity
+      on virtually every quote, not a special flag
+
+RECOMMENDATION: Do not present this quote as a simple "terms received,
+ready to move to bind" update. The inspection subjectivity should be
+flagged prominently and the retail agent should be informed IMMEDIATELY
+of the inspection scheduling deadline, since this is now a timeline-
+critical action item, not just informational. This is a case where
+Quote Comparison's output should trigger an urgent variant of the
+downstream Retail Agent Communication draft, not the standard "quote
+received" tone.
+
+MODE: Single quote, but flagged as TIMELINE-CRITICAL due to subjectivity
+(1) - this distinction (routine vs. material subjectivity) is the core
+thing this scenario tests.

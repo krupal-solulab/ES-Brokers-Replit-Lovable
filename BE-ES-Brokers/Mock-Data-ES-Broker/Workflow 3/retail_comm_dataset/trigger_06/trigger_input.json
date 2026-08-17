@@ -1,0 +1,16 @@
+{
+  "trigger_type": "QUOTE_TERMS_SUMMARY",
+  "source_workflow": "Manual broker input (Quote Comparison workflow not yet built)",
+  "submission_id": "SUB-3304",
+  "named_insured": "Summit Roofing Group LLC",
+  "retail_agent_name": "Tom Whitfield",
+  "retail_agency": "Liberty Line Insurance",
+  "agent_relationship_tenure": "1 year, moderate volume, newer relationship",
+  "carrier_name": "Ironclad Casualty Solutions",
+  "quoted_terms": {
+    "premium": "$118,000",
+    "limits": "$1,000,000 / $2,000,000 aggregate",
+    "prior_expiring_premium_context": "Not applicable - new business, but incumbent-market rate benchmark suggests this is roughly 60% above a clean contractor account of similar revenue"
+  },
+  "quote_context": "Rate reflects Ironclad's pricing for elevated severity - 2 BI claims from falls, one still open and reserved at $180,000"
+}

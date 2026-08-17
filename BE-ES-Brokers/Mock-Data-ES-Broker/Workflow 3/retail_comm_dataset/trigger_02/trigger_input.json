@@ -1,0 +1,15 @@
+{
+  "trigger_type": "MISSING_INFO_REQUEST",
+  "source_workflow": "Package Assembly",
+  "submission_id": "SUB-3302",
+  "named_insured": "Delta Electric Services LLC",
+  "retail_agent_name": "Rachel Combs",
+  "retail_agency": "Harbor Retail Agency",
+  "agent_relationship_tenure": "2 years, moderate volume",
+  "carrier_name": "Palmetto Specialty Underwriters",
+  "package_status": "BLOCKED",
+  "blocking_items": [
+    "Loss run only covers 3 of 5 years Palmetto requires",
+    "Supplemental contractor questionnaire not provided"
+  ]
+}

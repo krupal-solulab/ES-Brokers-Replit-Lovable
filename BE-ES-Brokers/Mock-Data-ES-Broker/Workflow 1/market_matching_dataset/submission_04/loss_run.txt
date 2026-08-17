@@ -1,0 +1,20 @@
+LOSS RUN REPORT
+Named Insured: Continental Freight Carriers Inc.
+Policy Period Covered: 09/01/2022 - 09/01/2027 (5 years)
+
+Claim 1
+  Date of Loss: 06/2024
+  Cause of Loss: Bodily Injury - multi-vehicle collision
+  Status: Closed
+  Incurred: $1,850,000
+
+Claim 2
+  Date of Loss: 11/2025
+  Cause of Loss: Bodily Injury - third party, rear-end collision
+  Status: Open
+  Incurred: $920,000
+  Reserve: $400,000
+
+Summary:
+  Total Incurred (5yr): $2,770,000
+  Loss Frequency Trend: Consistent with fleet size, within industry norms

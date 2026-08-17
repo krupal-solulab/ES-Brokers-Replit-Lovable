@@ -1,0 +1,16 @@
+{
+  "bind_id": "BIND-6601",
+  "named_insured": "Continental Freight Carriers Inc.",
+  "carrier_id": "CAR-06",
+  "carrier_name": "Vantage Excess Partners",
+  "current_terms": {
+    "premium": 335000,
+    "limits": "Excess Casualty $10,000,000 excess of $2,000,000 primary",
+    "effective_date": "2027-09-01",
+    "expiration_date": "2028-09-01"
+  },
+  "requested_change": {
+    "type": "additional_insured_endorsement",
+    "detail": "Add Midstate Distribution Co. as additional insured, scheduled to specific contract"
+  }
+}

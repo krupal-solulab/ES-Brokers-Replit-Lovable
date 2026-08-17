@@ -1,0 +1,19 @@
+{
+  "submission_id": "SUB-3301-multi",
+  "named_insured": "Delta Electric Services LLC",
+  "broker_selected_carriers": ["CAR-03", "CAR-01"],
+  "carriers": [
+    {
+      "carrier_id": "CAR-03",
+      "carrier_name": "Ironclad Casualty Solutions",
+      "carrier_requirements": {"required_documents": ["ACORD 125", "ACORD 126", "3-year loss run minimum", "current financials"], "min_loss_run_years": 3},
+      "documents_available": ["ACORD 125", "ACORD 126", "3-year loss run", "current financials"]
+    },
+    {
+      "carrier_id": "CAR-01",
+      "carrier_name": "Meridian Excess & Surplus",
+      "carrier_requirements": {"required_documents": ["ACORD 125", "ACORD 126", "5-year loss run", "current financials"], "min_loss_run_years": 5},
+      "documents_available": ["ACORD 125", "ACORD 126", "3-year loss run (2 years short)", "current financials"]
+    }
+  ]
+}

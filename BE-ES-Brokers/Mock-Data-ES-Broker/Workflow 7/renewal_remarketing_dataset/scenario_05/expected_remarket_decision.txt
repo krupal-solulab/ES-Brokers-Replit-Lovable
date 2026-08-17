@@ -1,0 +1,33 @@
+EXPECTED REMARKET DECISION OUTPUT — Summit Roofing Group (Post-Remarket Comparison)
+
+Comparability check (per RR-06, reusing Quote Comparison's QC-01
+discipline): NOT DIRECTLY COMPARABLE ON PREMIUM ALONE. Palmetto's quote
+is $16,000 cheaper, but carries a 3x higher deductible ($15,000 vs
+$5,000) - materially different retained-risk profile, not a simple
+"better deal."
+
+| | Ironclad (incumbent renewal) | Palmetto (remarket alternative) |
+|---|---|---|
+| Premium | $187,000 | $171,000 |
+| Deductible | $5,000 | $15,000 |
+| Retained risk per claim | Lower | Higher by $10,000 per occurrence |
+
+Additional context flag: Palmetto's quote required a MANUAL
+UNDERWRITING EXCEPTION to their stated severity ceiling - this is
+notable and should be surfaced explicitly, not just presented as a
+normal quote. An exception-based quote carries different reliability
+characteristics than a quote that's squarely within a carrier's
+standard appetite (per the same spirit as Market Matching's
+appetite_confidence field) - worth flagging to the broker as
+"available but non-standard," which may affect how much weight it
+should get relative to the incumbent's standard renewal.
+
+RECOMMENDATION: Present both options with this trade-off and context
+explicit - do NOT default to recommending Palmetto just because the
+premium is lower, per the same discipline established in Quote
+Comparison's original QC-01 test cases. Given this account's history of
+worsening severity, the broker (and client) may reasonably prefer
+Ironclad's lower retained risk despite the higher premium, or may
+prefer Palmetto's lower premium given the exception was granted - this
+is a genuine trade-off requiring broker/client judgment, not a clear
+system recommendation either way.

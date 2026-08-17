@@ -1,0 +1,23 @@
+EXPECTED OUTPUT — Q3 2027 Remarketing Value (PR-05)
+
+Renewals Reviewed: 18
+  No Remarket: 11 | Light Check: 3 | Full Remarket: 3 | Urgent: 1
+
+Remarketing outcomes for the 4 accounts that were actually remarketed
+(light + full + urgent): [detail per account]
+
+FLAG on "value realized" framing: for Summit Roofing's full remarket,
+$0 in direct savings was identified, but the remarket confirmed the
+incumbent was genuinely the best option on an account with real
+severity risk - per PR-05, this should NOT be reported as "$0 value" in
+a way that makes remarketing look wasted. The report should distinguish
+between "savings identified" (a dollar figure) and "confirmation value"
+(a qualitative but real outcome) rather than collapsing both into a
+single savings-only metric that would make Scenario 02's disciplined,
+correct FULL_REMARKET decision look like a failure in retrospect.
+
+This directly reflects the same principle established in Renewal
+Remarketing's RR-04 interpretation guide: a remarket that confirms the
+incumbent is still right is a legitimate, valuable outcome, not a null
+result - the reporting layer must not undo that framing by reducing
+everything to a single savings number.

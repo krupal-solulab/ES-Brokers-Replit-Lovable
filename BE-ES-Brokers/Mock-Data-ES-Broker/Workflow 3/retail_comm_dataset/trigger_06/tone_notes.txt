@@ -1,0 +1,23 @@
+TONE NOTES - Trigger 06
+
+- This is the hardest tone case in this dataset, comparable to the
+  MGA Non-Renewal Notice's difficulty level, for a different reason:
+  the news itself (a bindable quote) is objectively GOOD relative to
+  the alternative (no market at all, per Trigger 03's scenario type),
+  but the PRICE is going to read as bad news if not framed correctly
+- Explicitly connects the price to the specific loss history driving it
+  - an agent (especially a newer relationship, per agent_relationship_
+  tenure context) needs the "why" clearly stated, not just a number,
+  or they'll assume the wholesaler is padding margin rather than
+  passing through genuine market pricing
+- Reframes the outcome relative to the realistic alternative ("one of
+  the few markets willing to write this class at all... a real,
+  bindable quote rather than another declination") - this is honest
+  context, not spin, given Trigger 03's dataset already establishes
+  that a genuine zero-market outcome is a real possibility in this
+  vertical
+- Because this is a newer agent relationship (1 year, per trigger
+  data), the tone should be a notch more explanatory/patient than it
+  might be with a longtime agent who already understands E&S pricing
+  dynamics - this is the wholesale-specific analog to the MGA tone
+  rules' relationship-tenure-awareness principle (TN-04/TN-07)

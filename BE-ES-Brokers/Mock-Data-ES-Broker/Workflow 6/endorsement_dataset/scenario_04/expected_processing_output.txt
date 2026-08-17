@@ -1,0 +1,37 @@
+EXPECTED PROCESSING OUTPUT — Oakwood Apartment Homes
+
+Classification (per EP-01): Adding a location is a material change in
+TYPE (touches insured property/exposure), but Coastal Mutual's stated
+class (habitational/apartment management) already covers this
+location's use - this is "material but within known appetite," a
+distinct sub-case from Scenario 03's "material AND appetite-unknown"
+case. Still requires underwriting review (a $12.5M TIV addition is not
+a rubber-stamp change), but does not carry the same appetite-uncertainty
+flag.
+
+Appetite recheck (per EP-02): Class/use is consistent with Coastal
+Mutual's known appetite (habitational, apartment building management) -
+no class-scope concern. State licensing should be confirmed if
+Willowbrook Commons is in a different state than the existing insured
+location - not specified in this request, FLAG AS A REQUIRED
+CLARIFICATION before proceeding, don't assume same-state.
+
+Premium impact (per EP-03): PREMIUM-BEARING, and requires PRO-RATA
+CALCULATION (per EP-06) since this is a mid-term addition:
+  Policy term: 366 days total
+  Days elapsed at requested effective date (10/01/2027): 47
+  Days remaining in term: 319
+  Additional premium should be calculated on a pro-rata basis reflecting
+  the ~319/366 (~87%) of the term remaining, NOT a full-term premium
+  charge and NOT assumed free - flag pro-rata calculation as required,
+  do not draft an endorsement request without either the pro-rata
+  premium estimate or an explicit request for the carrier to quote it.
+
+RECOMMENDATION: Draft endorsement request to Coastal Mutual with full
+location details (address, TIV estimate, construction/occupancy details
+- request an updated SOV supplement from the retail agent per the same
+auto-fill boundary discipline established in Package Assembly, since
+Coverline should not estimate construction/occupancy details itself),
+and explicitly request pro-rata premium quote. Flag the unconfirmed
+state-licensing question as an open item requiring retail agent
+clarification before this can be finalized.

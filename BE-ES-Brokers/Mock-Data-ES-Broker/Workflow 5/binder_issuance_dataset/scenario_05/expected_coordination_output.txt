@@ -1,0 +1,26 @@
+EXPECTED COORDINATION OUTPUT — Clearpath Bookkeeping Services
+
+Policy issuance tracking (per BI-04):
+  Bind confirmed: 08/05/2027
+  Carrier's stated issuance timeline: 30 days (expected by ~09/04/2027)
+  Current date at check: 09/25/2027
+  DAYS OVERDUE: 21 days past the carrier's own stated timeline, policy
+  documents still not received.
+
+SYSTEM BEHAVIOR: Per BI-04, this must generate a proactive alert once
+the carrier's own stated issuance timeline is exceeded - not wait for
+the broker to notice on their own or for the retail agent to ask where
+the policy documents are. This is a monitoring responsibility, not a
+one-time check performed only at bind time.
+
+RECOMMENDED BROKER ACTION: Follow up directly with Apex Excess Lines on
+outstanding policy document issuance for binder AEL-2027-33012 - 21
+days overdue against their own stated 30-day timeline.
+
+Note: this does NOT necessarily mean coverage isn't in force - a
+binder is generally sufficient evidence of coverage even before full
+policy documents are issued - but a prolonged delay in receiving the
+actual policy is a real operational risk (harder to verify final bound
+terms, harder to provide proof of coverage documentation to the
+insured/retail agent in the exact form they may eventually need) and
+should be actively chased, not passively waited on.

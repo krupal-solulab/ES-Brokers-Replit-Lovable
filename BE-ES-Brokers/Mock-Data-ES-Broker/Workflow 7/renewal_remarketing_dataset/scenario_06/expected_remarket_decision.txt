@@ -1,0 +1,35 @@
+EXPECTED REMARKET DECISION — Clearpath Bookkeeping Services
+
+Exposure change detection (per RR-01): Revenue +9.0% - modest, not
+material.
+
+Loss history change detection (per RR-02): No new claims - flat.
+
+Incumbent appetite recheck (per RR-03): Proactive, reasonable, 37 days
+ahead of expiration.
+
+Renewal terms assessment: +6.25% premium increase, roughly proportional
+to exposure growth - unremarkable.
+
+Relationship/effort cost weighting (per RR-08): This account has been
+remarketed in each of the past 2 renewal cycles with no carrier change
+and minimal savings identified ($50-100) both times - a clear historical
+pattern showing remarketing this specific small account produces
+negligible value relative to broker time invested, and repeated annual
+shopping of a small, stable account can also strain the relationship
+with Apex Excess Lines for no real client benefit.
+
+Remarket trigger decision (per RR-04): NO REMARKET TRIGGERED, despite
+theoretically being "worth a two-minute check" in isolation. This
+decision is grounded specifically in the account's own remarketing
+HISTORY (per RR-08), not a generic "small accounts don't need
+remarketing" rule - the system should be able to point to the specific
+prior-cycle evidence (2 consecutive cycles, minimal savings) as the
+basis for this recommendation, not a size-based heuristic alone.
+
+RECOMMENDATION: Accept incumbent renewal terms. This scenario is
+included as a control case specifically to test that RR-08's
+relationship-cost weighting is doing real work - a system that
+remarkets every account every year regardless of demonstrated value is
+not actually helping the broker, it's just generating busywork that
+looks thorough.

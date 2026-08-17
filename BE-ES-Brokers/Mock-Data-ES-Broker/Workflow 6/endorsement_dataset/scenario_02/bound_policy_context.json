@@ -1,0 +1,18 @@
+{
+  "bind_id": "BIND-6604",
+  "named_insured": "Summit Roofing Group LLC",
+  "carrier_id": "CAR-03",
+  "carrier_name": "Ironclad Casualty Solutions",
+  "current_terms": {
+    "premium": 118000,
+    "limits": "General Liability $1,000,000/$2,000,000 aggregate",
+    "effective_date": "2027-08-01",
+    "expiration_date": "2028-08-01"
+  },
+  "requested_change": {
+    "type": "limit_increase",
+    "detail": "Increase GL limits from $1,000,000/$2,000,000 to $2,000,000/$4,000,000"
+  },
+  "carrier_severity_ceiling": 500000,
+  "loss_history_context": "existing open claim reserved at $180,000, per original bind"
+}

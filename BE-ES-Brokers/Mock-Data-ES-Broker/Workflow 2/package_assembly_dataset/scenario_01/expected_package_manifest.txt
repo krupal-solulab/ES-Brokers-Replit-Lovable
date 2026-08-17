@@ -1,0 +1,35 @@
+EXPECTED PACKAGE MANIFEST — Continental Freight Carriers -> Vantage Excess Partners
+
+STATUS: READY TO SEND (with one caveat noted below)
+
+Included documents:
+  [x] ACORD 125 - Commercial Insurance Application
+  [x] ACORD 126 - Commercial General Liability Section
+  [x] 5-year loss run
+  [x] Audited financial statement
+
+Outstanding items:
+  [ ] 5-year loss projection / actuarial summary — NOT available from
+      standard submission extraction; this is a carrier-specific
+      supplemental document that must be sourced from the insured or
+      their actuary, not something Coverline can generate or infer.
+      PACKAGE STATUS DOWNGRADED TO "READY WITH ONE GAP" rather than
+      fully ready, per PA-03.
+
+Draft Cover Letter (excerpt, full text in package):
+"Continental Freight Carriers is a 22-year, $60M+ revenue long-haul
+non-hazmat trucking operation seeking $10M excess casualty capacity
+above a $2M primary. Loss history reflects two claims over five years,
+consistent with fleet size and industry norms for this segment - no
+adverse frequency or severity trend. Financials are audited. We're
+requesting the actuarial loss projection separately and will forward
+once received."
+
+TONE NOTES:
+- Cover letter proactively acknowledges the one gap rather than hoping
+  the carrier doesn't notice - this is a credibility-building framing
+  for a wholesale broker, not just a formality (see PA-04)
+- "Consistent with fleet size and industry norms" is a grounded claim,
+  not a vague reassurance - if extraction can't support this level of
+  benchmarking, it should be either sourced from the carrier profile's
+  notes or omitted, not fabricated

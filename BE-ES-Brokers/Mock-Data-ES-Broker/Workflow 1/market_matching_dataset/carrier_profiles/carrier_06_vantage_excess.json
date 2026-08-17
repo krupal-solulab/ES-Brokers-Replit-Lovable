@@ -1,0 +1,19 @@
+{
+  "carrier_id": "CAR-06",
+  "carrier_name": "Vantage Excess Partners",
+  "lines_written": ["Excess Casualty", "General Liability"],
+  "class_codes_accepted": ["trucking - non-hazmat", "contractors - general", "large mercantile/retail", "apartment building management"],
+  "class_codes_excluded": ["cannabis", "asbestos abatement"],
+  "states_licensed": ["SC", "NC", "GA", "TN", "VA", "AL", "MS", "FL"],
+  "premium_band": {"min": 100000, "max": 2000000},
+  "submission_requirements": {
+    "min_loss_run_years": 5,
+    "required_documents": ["ACORD 125", "ACORD 126", "5-year loss run", "audited financials", "5-year loss projection/actuarial summary"],
+    "acceptance_window_days": 90
+  },
+  "severity_ceiling": {"max_single_claim_incurred": 2000000},
+  "appetite_confidence": "high",
+  "appetite_last_updated": "2027-06-01",
+  "historical_hit_rate_this_class": 0.45,
+  "notes": "Large/complex risk specialist - not a fit for accounts below $100K indicated premium regardless of otherwise clean profile"
+}

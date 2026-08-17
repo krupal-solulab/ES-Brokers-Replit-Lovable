@@ -1,0 +1,30 @@
+EXPECTED COORDINATION OUTPUT — Summit Roofing Group
+
+Pre-bind subjectivity status: all cleared, no blocking items - bind
+proceeded cleanly.
+
+Carrier confirmation reconciliation (per BI-03): CLEAN, all terms match.
+
+SYSTEM BEHAVIOR - critical distinction (per BI-07): the loss control
+report requirement did NOT block this bind, correctly, because it was
+classified as a POST_BIND_ONGOING obligation rather than a pre-bind
+blocker (this classification originated in Quote Comparison's QC-02
+tiering and must be preserved through to this workflow, not
+re-evaluated from scratch).
+
+This is now tracked as an ONGOING TASK, not a bind blocker:
+  Task: Submit updated loss control report to Ironclad
+  Due: 09/29/2027 (60 days from binding)
+  Status: Open, tracked - reminder to be surfaced to broker at a
+  configurable interval before the deadline (e.g., 15 and 5 days prior)
+
+DOWNSTREAM TRIGGER: Placement Confirmation fires normally (this is a
+clean bind) - the ongoing loss control obligation does NOT delay or
+complicate the retail agent communication, since it's the wholesaler's/
+insured's ongoing obligation to the carrier, not something that affects
+whether coverage is currently in force.
+
+This scenario tests the distinction between BI-02 (pre-bind blocking)
+and BI-07 (post-bind ongoing tracking) - the same underlying kind of
+requirement (a loss control report) is handled completely differently
+depending on WHEN in the lifecycle it applies.

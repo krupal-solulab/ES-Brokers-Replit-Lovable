@@ -1,0 +1,16 @@
+{
+  "submission_id": "SUB-3301",
+  "named_insured": "Continental Freight Carriers Inc.",
+  "carrier_id": "CAR-06",
+  "carrier_name": "Vantage Excess Partners",
+  "selected_quote_id": "Q-9901",
+  "bind_terms_requested": {
+    "premium": 335000,
+    "limits": "Excess Casualty $10,000,000 excess of $2,000,000 primary",
+    "effective_date": "2027-09-01"
+  },
+  "subjectivities_at_selection": [
+    {"description": "primary carrier binding confirmed", "materiality": "material", "status": "cleared - primary bound 08/20/2027"},
+    {"description": "signed application", "materiality": "routine", "status": "cleared"}
+  ]
+}

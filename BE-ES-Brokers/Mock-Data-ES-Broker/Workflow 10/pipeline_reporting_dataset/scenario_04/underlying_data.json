@@ -1,0 +1,9 @@
+{
+  "period": "Q3 2027",
+  "renewals_reviewed": 18,
+  "remarket_triggers": {"no_remarket": 11, "light_check": 3, "full_remarket": 3, "urgent_remarket": 1},
+  "remarket_outcomes": [
+    {"account": "Summit Roofing Group", "trigger": "full_remarket", "savings_identified": 0, "note": "confirmed incumbent remained best option - no switch, no savings, but value was in the confirmation itself"},
+    {"account": "Clearpath Bookkeeping (prior 2 cycles)", "trigger": "no_remarket - per RR-08 history", "savings_identified": "N/A - not remarketed", "note": "excluded from savings calc since not shopped, per its own suppression history"}
+  ]
+}

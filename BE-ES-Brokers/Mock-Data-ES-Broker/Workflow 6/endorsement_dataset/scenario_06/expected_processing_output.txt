@@ -1,0 +1,37 @@
+EXPECTED PROCESSING OUTPUT — Clearpath Bookkeeping Services
+
+Classification (per EP-01): Borderline case worth walking through
+explicitly. A headcount increase from 4 to 7 (75% increase) on a very
+small account is a MATERIAL percentage change, but the account is small
+enough in absolute terms ($2,400 premium) that it's worth checking
+whether this crosses any of Apex Excess Lines' own stated thresholds
+rather than assuming materiality by percentage alone. This is a
+DIFFERENT judgment than Scenario 02's limit increase - percentage
+change alone should not be the only signal; absolute exposure change
+matters too, and this system should surface both the percentage AND the
+absolute change rather than only the percentage, which can be
+misleading at small scale.
+
+Appetite recheck (per EP-02): No class or state change - low appetite
+risk. Employee count increase alone does not typically threaten
+appetite fit at this scale.
+
+Premium impact (per EP-03): LIKELY PREMIUM-BEARING (headcount-rated
+classes often price per employee), but likely a modest adjustment given
+the account's small overall premium. Flag as premium-bearing, request
+carrier quote for the pro-rata adjustment - do not assume the amount
+is negligible just because the base premium is small; let the carrier
+confirm.
+
+Proration check (per EP-06): 309 of 366 days remain in the term (~84%)
+- standard pro-rata calculation applies, no edge case here despite the
+account being late in a fairly ordinary part of its term. (Included in
+this dataset specifically as a NON-edge-case control, to test that the
+system doesn't manufacture false urgency or complexity on a
+straightforward timing situation just because other scenarios in this
+set involve harder timing judgments.)
+
+RECOMMENDATION: Draft a standard headcount-update endorsement request
+to Apex Excess Lines with pro-rata premium request - routine handling,
+no special escalation needed, distinct from Scenarios 02/03's
+underwriting-review path.

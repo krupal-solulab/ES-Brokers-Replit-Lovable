@@ -1,0 +1,34 @@
+EXPECTED COORDINATION OUTPUT — Delta Electric Services (DISCREPANCY DETECTED)
+
+Carrier confirmation reconciliation (per BI-03):
+  Binder Number: ICS-2027-51203
+  Premium: $26,500 - MATCHES requested
+  Limits: MATCHES requested
+  Deductible: CONFIRMED AS $5,000 vs. REQUESTED $2,500 - DISCREPANCY
+  Effective Date: CONFIRMED AS 09/03/2027 vs. REQUESTED 09/01/2027 -
+    DISCREPANCY (2-day gap)
+
+STATUS: DISCREPANCY FLAGGED, NOT auto-accepted as a clean bind.
+
+SYSTEM BEHAVIOR: Per BI-03, a binder confirmation that doesn't match
+the requested bind terms on ANY material field (deductible, effective
+date, premium, or limits) must be flagged for broker review before
+being treated as a confirmed, clean bind - even though a binder number
+was issued and the carrier clearly considers this bound on their end.
+Do NOT silently accept the carrier's confirmed terms as correct just
+because a binder number exists, and do NOT silently keep the broker's
+originally requested terms as the system of record either - surface
+BOTH values side by side and require explicit broker acknowledgment of
+which is correct (this may be a legitimate last-minute change agreed
+verbally, or it may be a carrier processing error).
+
+DOWNSTREAM TRIGGER: Placement Confirmation to the retail agent should
+be HELD until this discrepancy is resolved - sending a placement
+confirmation with terms that don't match what's actually bound would
+create a real, compounding error if the retail agent relays incorrect
+terms to their client.
+
+This scenario is the single most important test case in this dataset:
+it tests that the system treats a carrier's own bind confirmation as
+data to be checked, not as unquestionable ground truth just because it
+comes from the carrier.

@@ -1,0 +1,17 @@
+{
+  "submission_id": "SUB-3303",
+  "named_insured": "Oakwood Apartment Homes LP",
+  "carrier_id": "CAR-04",
+  "carrier_name": "Coastal Mutual Specialty",
+  "selected_quote_id": "Q-9902",
+  "bind_terms_requested": {
+    "premium": 81500,
+    "limits": "Property $18,000,000 blanket; GL $1,000,000/$2,000,000",
+    "effective_date": "2027-08-15"
+  },
+  "subjectivities_at_selection": [
+    {"description": "satisfactory loss control inspection prior to binding, must be scheduled within 10 days", "materiality": "material", "status": "NOT YET SCHEDULED"},
+    {"description": "current SOV confirmed", "materiality": "routine", "status": "cleared"},
+    {"description": "no new claims prior to binding", "materiality": "routine", "status": "cleared"}
+  ]
+}

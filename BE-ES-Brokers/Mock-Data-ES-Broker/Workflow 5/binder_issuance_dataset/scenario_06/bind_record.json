@@ -1,0 +1,14 @@
+{
+  "submission_id": "SUB-3303",
+  "named_insured": "Oakwood Apartment Homes LP",
+  "carrier_id": "CAR-04",
+  "carrier_name": "Coastal Mutual Specialty",
+  "binder_number": "CMS-2027-77410",
+  "bound_terms_confirmed": {
+    "premium": 81500,
+    "property_limit": 18000000,
+    "gl_limits": "1,000,000/2,000,000",
+    "deductibles": {"all_perils": 10000, "wind_hail": 50000},
+    "effective_date": "2027-08-15"
+  }
+}

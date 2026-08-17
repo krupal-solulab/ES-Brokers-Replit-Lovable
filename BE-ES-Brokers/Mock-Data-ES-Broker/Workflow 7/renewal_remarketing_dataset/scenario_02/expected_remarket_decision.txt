@@ -1,0 +1,33 @@
+EXPECTED REMARKET DECISION — Summit Roofing Group
+
+Exposure change detection (per RR-01): Revenue +3.8% - not material on
+its own.
+
+Loss history change detection (per RR-02): ONE NEW CLAIM during
+expiring term (fall injury, $95,000 reserve), added to an already
+elevated loss history - this is a material adverse signal (frequency
+AND continued severity on a class that was already at the edge of this
+carrier's tolerance at original binding).
+
+Incumbent appetite recheck (per RR-03): Incumbent DID renew (still
+within appetite), but pricing reflects the continued adverse loss
+experience heavily - 58.5% premium increase, far exceeding the 3.8%
+exposure growth.
+
+Remarket trigger decision (per RR-04): REMARKET TRIGGERED. A premium
+increase this disproportionate to exposure growth, driven by continued
+loss activity, warrants checking whether Ironclad remains the best
+available option - not because the increase is unjustified (the loss
+history genuinely supports higher pricing) but because it's material
+enough that confirming there's no better-fit alternative is worth the
+remarketing effort, even on an account with historically limited market
+options.
+
+RECOMMENDED ACTION: Re-run Market Matching (per RR-05) against this
+account's current profile. EXPECTATION, per the account's known
+appetite-restrictive history (previously only Ironclad fit at binding
+per the original Market Matching dataset): remarketing is UNLIKELY to
+surface a materially better alternative given this account's severity
+profile, but the disproportionate increase still justifies confirming
+that rather than assuming it - the broker and client should know a
+genuine market check was done before accepting a 58.5% increase.

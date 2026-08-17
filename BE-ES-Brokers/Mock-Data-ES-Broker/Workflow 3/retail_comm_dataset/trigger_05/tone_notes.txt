@@ -1,0 +1,15 @@
+TONE NOTES - Trigger 05
+
+- Same good-faith, non-accusatory assumption as the MGA equivalent
+  ("didn't slip through," not "haven't heard from you")
+- References the carrier's actual acceptance window (45 days, 36
+  remaining) rather than an arbitrary urgency - this is a genuinely
+  useful, concrete piece of information for the agent to have, and it
+  correctly signals LOW urgency here, unlike the MGA effective-date
+  version which was usually anchored to a tighter, harder deadline.
+  Wholesale placements often have more schedule slack than MGA renewal/
+  binding deadlines - the tone should reflect that difference honestly
+  rather than manufacturing urgency that doesn't exist
+- Should only fire once per outstanding request, per the same one-
+  follow-up-per-request constraint established in the MGA Broker
+  Communication PRD

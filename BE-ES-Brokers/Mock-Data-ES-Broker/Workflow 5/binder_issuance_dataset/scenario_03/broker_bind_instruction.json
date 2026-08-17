@@ -1,0 +1,17 @@
+{
+  "submission_id": "SUB-3301-multi",
+  "named_insured": "Delta Electric Services LLC",
+  "carrier_id": "CAR-03",
+  "carrier_name": "Ironclad Casualty Solutions",
+  "selected_quote_id": "Q-9903",
+  "bind_terms_requested": {
+    "premium": 26500,
+    "limits": "General Liability $1,000,000/$2,000,000 aggregate",
+    "effective_date": "2027-09-01",
+    "deductible": 2500
+  },
+  "subjectivities_at_selection": [
+    {"description": "signed application", "materiality": "routine", "status": "cleared"},
+    {"description": "no material change in operations prior to binding", "materiality": "routine", "status": "cleared"}
+  ]
+}

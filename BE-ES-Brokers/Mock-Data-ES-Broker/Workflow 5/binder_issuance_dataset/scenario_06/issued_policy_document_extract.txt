@@ -1,0 +1,10 @@
+POLICY DECLARATIONS PAGE (extracted text)
+Named Insured: Oakwood Apartment Homes LP
+Policy Number: CMS-POL-2027-77410
+Premium: $81,500
+Property Limit: $18,000,000
+General Liability Limits: $1,000,000/$2,000,000
+Deductibles:
+  All Perils: $10,000
+  Windstorm or Hail: $100,000
+Effective Date: 08/15/2027

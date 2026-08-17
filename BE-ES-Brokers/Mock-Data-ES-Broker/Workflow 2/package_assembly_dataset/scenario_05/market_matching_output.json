@@ -1,0 +1,19 @@
+{
+  "submission_id": "SUB-3304",
+  "named_insured": "Summit Roofing Group LLC",
+  "broker_selected_carriers": ["CAR-03"],
+  "carrier_id": "CAR-03",
+  "carrier_name": "Ironclad Casualty Solutions",
+  "carrier_requirements": {
+    "required_documents": ["ACORD 125", "ACORD 126", "3-year loss run minimum", "current financials"],
+    "min_loss_run_years": 3
+  },
+  "documents_available_from_extraction": ["ACORD 125", "ACORD 126", "5-year loss run", "reviewed financials"],
+  "loss_history_summary": {
+    "total_incurred_5yr": 475000,
+    "trend": "worsening - severity increasing",
+    "open_claim_reserve": 180000
+  },
+  "carrier_notes": "Higher risk tolerance carrier - accepts steep-slope roofing and higher severity accounts other carriers decline. Rate loaded accordingly.",
+  "diligent_search": {"required": true, "documentation_status": "present", "declinations_on_file": 2}
+}
