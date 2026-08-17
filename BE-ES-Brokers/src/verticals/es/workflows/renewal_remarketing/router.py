@@ -198,7 +198,7 @@ async def _maybe_notify_urgent_remarket(session: AsyncSession, ctx: Ctx, payload
     if (payload.get("trigger_decision") or {}).get("level") != "URGENT_REMARKET":
         return False
     channel_id = await resolve_channel_id(session, ctx.tenant_id, get_settings())
-    connector = build_connector_service(session=session, tenant_id=ctx.tenant_id)
+    connector = build_connector_service(workflow_n=DEFAULT_WORKFLOW_N, session=session, tenant_id=ctx.tenant_id)
     text = (
         f"URGENT_REMARKET: {payload.get('named_insured') or 'A policy'} "
         f"(incumbent: {payload.get('incumbent_carrier_name') or 'unknown'}) — the incumbent "

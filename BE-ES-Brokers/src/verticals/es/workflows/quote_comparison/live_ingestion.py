@@ -23,6 +23,9 @@ from core.common.dtos import Ctx, RawBundle, RawDocument
 from core.common.enums import DocumentKind
 from core.config import get_settings
 from core.documents.store import LocalDocumentStore
+# Matches this workflow's service.DEFAULT_WORKFLOW_N (imported lazily to avoid a
+# service<->live_ingestion circular import).
+_DEFAULT_WORKFLOW_N = 13
 from core.ingestion.connectors import (
     ConnectorNotConnectedError,
     LiveNangoConnectorService,
@@ -51,7 +54,9 @@ async def _real_named_insured(session: AsyncSession, ctx: Ctx, submission_id: st
 def _require_live_connector(session: AsyncSession) -> LiveNangoConnectorService:
     from core.ingestion.connectors import unwrap_live_connector
 
-    return unwrap_live_connector(build_connector_service(session=session))
+    return unwrap_live_connector(
+        build_connector_service(workflow_n=_DEFAULT_WORKFLOW_N, session=session)
+    )
 
 
 async def discover_live_carrier_responses(

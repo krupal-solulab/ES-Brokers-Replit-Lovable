@@ -34,6 +34,9 @@ from core.common.dtos import Ctx, RawDocument
 from core.common.enums import DocumentKind
 from core.config import get_settings
 from core.documents.store import LocalDocumentStore
+# Matches this workflow's service.DEFAULT_WORKFLOW_N (imported lazily to avoid a
+# service<->live_ingestion circular import).
+_DEFAULT_WORKFLOW_N = 15
 from core.ingestion.connectors import (
     ConnectorNotConnectedError,
     LiveNangoConnectorService,
@@ -52,7 +55,9 @@ _ISSUED_ENDORSEMENT_FILENAME = "carrier_issued_endorsement.txt"
 def _require_live_connector(session: AsyncSession) -> LiveNangoConnectorService:
     from core.ingestion.connectors import unwrap_live_connector
 
-    return unwrap_live_connector(build_connector_service(session=session))
+    return unwrap_live_connector(
+        build_connector_service(workflow_n=_DEFAULT_WORKFLOW_N, session=session)
+    )
 
 __all__ = [
     "build_bound_policy_context_from_binder",

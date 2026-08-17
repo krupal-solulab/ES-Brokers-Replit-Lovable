@@ -67,6 +67,9 @@ from sqlmodel import col, select
 from core.admin.settings_override import get_effective_setting
 from core.common.dtos import Ctx
 from core.config import get_settings
+# Matches this workflow's service.DEFAULT_WORKFLOW_N (imported lazily to avoid a
+# service<->live_ingestion circular import).
+_DEFAULT_WORKFLOW_N = 16
 from core.ingestion.connectors import build_connector_service
 from core.ingestion.slack_writeback import resolve_channel_id, try_notify_slack
 from core.jobs.monitor import SEVERITY_URGENT, MonitorAlertIn, register_monitor
@@ -139,7 +142,7 @@ async def _slack_notify_urgent(
     router module (dependency inversion)."""
     try:
         channel_id = await resolve_channel_id(session, ctx.tenant_id, get_settings())
-        connector = build_connector_service(session=session, tenant_id=ctx.tenant_id)
+        connector = build_connector_service(workflow_n=_DEFAULT_WORKFLOW_N, session=session, tenant_id=ctx.tenant_id)
         text = (
             f"URGENT_REMARKET: {payload.get('named_insured') or 'A policy'} "
             f"(incumbent: {payload.get('incumbent_carrier_name') or 'unknown'}) — "

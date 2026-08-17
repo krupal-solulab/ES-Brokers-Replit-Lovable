@@ -10,6 +10,7 @@ Rule: one shared resolver (`core/data_mode.py`) decides live vs static (reasons:
 **How to apply:**
 - Static output only ever comes from the existing MockConnectorService/fixtures path — never a parallel data source, never fabricated numbers.
 - Writeback/outbound connector methods (send_email, put_file, upload_file, append_rows, create_event, send_slack_message) are deliberately EXCLUDED from the fallback — they still raise ConnectorNotConnectedError so routers report "skipped — not connected" instead of pretending a real write happened.
+- Every `build_connector_service()` call site MUST pass the workflow's real `workflow_n` — the factory defaults to 1 (an unbundled MGA dataset), so an omitted workflow_n makes mock/fallback mode silently serve empty fixtures for that workflow.
 - Live-ingestion helpers that truly need the live service must use `unwrap_live_connector()` (the factory returns a StaticFallbackConnectorService wrapper in live mode, so bare `isinstance(..., LiveNangoConnectorService)` checks break).
 - LLM quota flag: only insufficient_quota/billing errors flip it (plain 429 rate limits do not); process-local with 5-min TTL — a known single-process limitation.
 - Connector check covers ALL four registered connectors (mail, sheet, drive, slack) as one combined per-tenant cached answer (15s TTL); ANY missing one flips the whole product static. Connect/disconnect endpoints must call `invalidate_connection_cache(tenant_id)`.
