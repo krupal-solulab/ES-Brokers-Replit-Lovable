@@ -1,0 +1,56 @@
+Fix five issues on Submission Market Matching (Workflow 1). Respect two hard
+boundaries: (a) the ranking/score is DETERMINISTIC engine output — do not let any AI
+step compute or alter a score (KB06); (b) no action here may auto-send to a carrier —
+human approval happens downstream (Package Assembly / Agent Communication).
+
+1. CLARIFY "Top score" and "Outcome".
+   - Relabel "Top score" to "Top fit score" and add a short tooltip/subtext: it is a
+     RELATIVE composite ranking score (class-fit specificity + submission completeness
+     + historical hit-rate + premium-band position), NOT a probability of binding.
+   - Show the score's component breakdown on the top-ranked carrier (and on hover for
+     each carrier row), sourced from the engine, so the number is explainable.
+   - Label "Outcome" with its meaning: MATCHES_FOUND (carriers survived hard exclusion),
+     REQUEST_INFO (missing readable class code / premium — cannot match yet), NO_MATCH
+     (every carrier hard-excluded — never a "best available" fallback, per FR-11).
+
+2. SCOPE ALL DISPLAYED DATA TO THE SELECTED SUBMISSION ONLY.
+   - Remove the silent `?? items[0]` fallback. If nothing is selected, show a "Select a
+     submission" empty state, not another submission's data.
+   - After "Check live inbox" imports a submission, auto-select THAT submission so every
+     panel (top score, outcome, carrier ranking, recommendation, documents) reflects the
+     imported email. Every panel must key off the one selected submission id.
+
+3. REPLACE THE PLACEHOLDER "AI RECOMMENDATION" WITH A GROUNDED RECOMMENDATION.
+   - Build it from the deterministic ranked output only: "Approach <top carrier(s)> —
+     <their score-driving reasons>. Hold <carriers with missing items> pending <the
+     specific missing documents/loss-run items>. Excluded: <carriers> per <MM rule +
+     reason>." Every line must trace to an engine field (score components, `missing`,
+     `flags`, `excluded.rule/reason`) — never invented text.
+   - If phrased in natural language by the model, the model may ONLY rephrase the
+     engine's recorded reasons; it must not introduce any carrier, number, or reason not
+     present in the engine output, and must not restate the score. If the engine has no
+     recommendation basis (NO_MATCH), say so plainly.
+
+4. ADD REAL "SEND" = HANDOFF TO PACKAGE ASSEMBLY (FR-13).
+   - The "Send" action takes the broker's selected carrier(s) from the ranking and
+     creates/links the Package Assembly input for exactly those carriers, then navigates
+     to Package Assembly for that submission. Disable it until >=1 carrier is selected.
+   - Write an audit record (who, when, which submission, which carriers). It must NOT
+     email any carrier directly — outbound carrier contact remains a downstream,
+     human-approved step.
+
+5. MAKE "OVERRIDE" DO SOMETHING; REMOVE/REPURPOSE "ISSUE".
+   - Override: allow a senior/admin to include a HARD-EXCLUDED carrier anyway. Require a
+     typed reason, write an audit entry (carrier, rule overridden, reason, user), and
+     move that carrier into the selectable shortlist so it can be sent in step 4. It must
+     never silently flip a status with no reason.
+   - Issue: "issue" is not a Market Matching concept (it is a binder term). Remove the
+     Issue button from this workflow. If a "proceed" action is wanted, that is the Send
+     handoff in step 4 — do not keep a no-op Issue button.
+
+VERIFY on the Briarcliff submission: the top score shows its breakdown and a "not a
+probability" note; importing a second email switches every panel to that email; the
+recommendation names only real ranked/excluded carriers with real reasons; selecting
+Ironclad + Meridian and clicking Send creates a Package Assembly entry for just those
+two with an audit row; overriding an excluded carrier requires a reason and then makes
+it selectable; the Issue button is gone.

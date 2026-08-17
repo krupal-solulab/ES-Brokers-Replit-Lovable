@@ -145,6 +145,10 @@ class MarketMatchingPipeline:
         ds = decision.details.get("diligent_search", {})
         payload = MarketMatchingPayload(
             submission_id=data.submission_id,
+            # Engine-recorded outcome code; the missing-ACORD early return has
+            # no details, so it maps to REQUEST_INFO explicitly here.
+            outcome=decision.details.get("outcome")
+            or ("REQUEST_INFO" if decision.outcome == DecisionOutcome.REQUEST_INFO else None),
             matches=[CarrierMatchOut(**m) for m in decision.details.get("matches", [])],
             excluded=[ExcludedCarrierOut(**e) for e in decision.details.get("excluded", [])],
             diligent_search=DiligentSearchOut(**ds) if ds else DiligentSearchOut(

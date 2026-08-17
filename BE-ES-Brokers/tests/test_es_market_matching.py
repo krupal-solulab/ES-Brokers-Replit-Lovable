@@ -190,6 +190,39 @@ async def test_missing_acord_yields_request_info(es_session, es_ctx) -> None:
     assert decision.outcome is DecisionOutcome.REQUEST_INFO
 
 
+async def test_score_components_and_outcome_codes(es_session, es_ctx) -> None:
+    """Regression for the deterministic breakdown + explicit outcome signal:
+    each ranked match carries the engine's five score components + weights, and
+    the decision records MATCHES_FOUND / NO_MATCH / REQUEST_INFO explicitly."""
+    _, decision = await _decide_for(es_session, es_ctx, "submission_01")
+    assert decision.details["outcome"] == "MATCHES_FOUND"
+    top = decision.details["matches"][0]
+    assert set(top["score_components"]) == {
+        "class_fit_specificity", "completeness_score", "historical_hit_rate",
+        "appetite_confidence_weight", "severity_margin",
+    }
+    assert top["score_weights"] and abs(sum(top["score_weights"].values()) - 1.0) < 1e-9
+
+    _, no_match = await _decide_for(es_session, es_ctx, "submission_06")
+    assert no_match.details["outcome"] == "NO_MATCH"
+
+    # No readable class code / premium (but panel evaluable) → REQUEST_INFO,
+    # not a false "every carrier excluded" NO_MATCH.
+    pipeline = _pipeline(es_session)
+    raw = RawBundle(
+        submission_id="synthetic-blank-acord",
+        documents=[
+            RawDocument(
+                kind=DocumentKind.ACORD_125, filename="acord.txt",
+                content="Named Insured: Test Co\n",
+            )
+        ],
+    )
+    model = await pipeline.extract(es_ctx, raw)
+    decision = await pipeline.decide(es_ctx, model)
+    assert decision.details.get("outcome") == "REQUEST_INFO"
+
+
 async def test_full_pipeline_draft_review_and_audit(es_session, es_ctx) -> None:
     """ingest -> extract -> decide -> draft -> package -> review queue -> audit,
     end to end, for a real submission with an actual top match."""

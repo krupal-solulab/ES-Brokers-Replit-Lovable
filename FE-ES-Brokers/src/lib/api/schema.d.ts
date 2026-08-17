@@ -230,40 +230,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/es/market-matching/{item_id}/send": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Send */
-        post: operations["send_api_es_market_matching__item_id__send_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/es/market-matching/{item_id}/issue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Issue */
-        post: operations["issue_api_es_market_matching__item_id__issue_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/es/package-assembly/run": {
         parameters: {
             query?: never;
@@ -1452,6 +1418,10 @@ export interface components {
             carrier_name: string;
             /** Score */
             score: number;
+            /** Score Components — deterministic engine breakdown (KB06) */
+            score_components?: Record<string, number> | null;
+            /** Score Weights */
+            score_weights?: Record<string, number> | null;
             /**
              * Missing
              * @default []
@@ -1462,6 +1432,15 @@ export interface components {
              * @default []
              */
             flags: string[];
+            /**
+             * Overridden — senior/admin manually included despite hard exclusion
+             * @default false
+             */
+            overridden?: boolean;
+            /** Override Rule */
+            override_rule?: string | null;
+            /** Override Reason */
+            override_reason?: string | null;
         };
         /** CarrierPerformanceOut */
         CarrierPerformanceOut: {
@@ -2065,6 +2044,8 @@ export interface components {
         MarketMatchingPayload: {
             /** Submission Id */
             submission_id: string | null;
+            /** Outcome — "MATCHES_FOUND" | "REQUEST_INFO" | "NO_MATCH" (engine-recorded; null on older payloads) */
+            outcome?: string | null;
             /**
              * Matches
              * @default []

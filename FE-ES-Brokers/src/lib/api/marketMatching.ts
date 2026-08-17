@@ -16,7 +16,11 @@ export type CarrierMatchOut = components["schemas"]["CarrierMatchOut"];
 export type ExcludedCarrierOut = components["schemas"]["ExcludedCarrierOut"];
 export type DiligentSearchOut = components["schemas"]["DiligentSearchOut"];
 export type DocumentOut = components["schemas"]["DocumentOut"];
-export type ReviewActionVerb = "approve" | "override" | "escalate" | "send" | "issue";
+/** Status-flip verbs still exposed for Market Matching. "issue" is a binder
+ * concept (removed from this workflow); "override" is now the audited
+ * exclusion-override below (requires carrier + typed reason); "send" is the
+ * Package Assembly handoff (see packageAssembly.ts), not a bare status flip. */
+export type ReviewActionVerb = "approve" | "escalate";
 
 const BASE = "/api/es/market-matching";
 
@@ -50,6 +54,17 @@ export function runMarketMatching(submissionRef: string) {
 
 export function actOnMarketMatching(itemId: string, action: ReviewActionVerb) {
   return api.post<ReviewItemOut>(`${BASE}/${itemId}/${action}`);
+}
+
+/** Senior/admin only: include a HARD-EXCLUDED carrier in the shortlist anyway.
+ * Requires a typed reason; the backend writes an audit entry (carrier, rule
+ * overridden, reason, user) and moves the carrier into `matches` with NO
+ * engine score (`overridden: true`, score 0). */
+export function overrideMarketMatchingExclusion(itemId: string, carrierId: string, reason: string) {
+  return api.post<ReviewItemOut>(`${BASE}/${itemId}/override`, {
+    carrier_id: carrierId,
+    reason,
+  });
 }
 
 export interface LiveInboxMessage {

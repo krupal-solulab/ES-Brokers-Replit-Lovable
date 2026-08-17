@@ -75,9 +75,14 @@ export function editPackageAssembly(itemId: string, editedBody: string) {
 export function runPackageAssemblyFromMarketMatching(
   marketMatchingReviewItemId: string,
   carrierId?: string,
+  carrierIds?: string[],
 ) {
   return api.post<ReviewItemOut[]>(`${BASE}/run-from-market-matching`, {
     market_matching_review_item_id: marketMatchingReviewItemId,
     ...(carrierId ? { carrier_id: carrierId } : {}),
+    // FR-13 Send handoff: the broker's explicit shortlist — the backend writes
+    // a human audit entry (who/when/submission/carriers) and assembles exactly
+    // these carriers. Nothing is emailed to any carrier by this call.
+    ...(carrierIds && carrierIds.length > 0 ? { carrier_ids: carrierIds } : {}),
   });
 }

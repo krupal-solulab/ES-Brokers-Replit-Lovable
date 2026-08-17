@@ -16,7 +16,7 @@ from sqlmodel import col, select
 from core.audit import DefaultAuditService
 from core.common.dtos import AuditEntry, Ctx, WorkflowInput
 from core.utils.edit_distance import levenshtein_distance, normalized_edit_distance
-from core.common.enums import ReviewAction
+from core.common.enums import ReviewAction, Role
 from core.db import get_session
 from core.extraction import DefaultExtractionService
 from core.llm import build_llm_service
@@ -58,6 +58,10 @@ class RunRequest(BaseModel):
 class RunFromMarketMatchingRequest(BaseModel):
     market_matching_review_item_id: str
     carrier_id: str | None = None  # omit to assemble ALL matched carriers (FR-2/FR-23)
+    # FR-13 Send handoff: the broker's explicit shortlist selection. When set,
+    # packages are assembled for exactly these carriers and a human audit entry
+    # (who/when/submission/carriers) is written. Takes precedence over carrier_id.
+    carrier_ids: list[str] | None = None
 
 
 class EditBodyIn(BaseModel):
@@ -143,15 +147,57 @@ async def run_package_assembly_from_market_matching(
     sequentially (unlike ``/run``'s ``asyncio.gather``) since each pass
     reads real data through the one shared ``AsyncSession``, which isn't
     safe to touch from concurrent coroutines."""
-    carrier_ids = (
-        [body.carrier_id]
-        if body.carrier_id
-        else await discover_live_carrier_ids(session, ctx, body.market_matching_review_item_id)
-    )
+    if body.carrier_ids is not None:
+        # FR-13 Send handoff is a consequential, audited action — senior/admin
+        # only, mirroring the old ReviewAction.SEND authority rule.
+        if ctx.role not in (Role.SENIOR, Role.ADMIN):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Only senior or admin roles may send a carrier shortlist to Package Assembly",
+            )
+        if not body.carrier_ids:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "carrier_ids must contain at least one carrier",
+            )
+        carrier_ids = body.carrier_ids
+    elif body.carrier_id:
+        carrier_ids = [body.carrier_id]
+    else:
+        carrier_ids = await discover_live_carrier_ids(
+            session, ctx, body.market_matching_review_item_id
+        )
 
     review_queue = DefaultReviewQueueService()
     audit = DefaultAuditService()
     items: list[ReviewItemOut] = []
+
+    if body.carrier_ids is not None:
+        # FR-13: audit the broker's Send handoff — who, when, which submission,
+        # which carriers. This creates Package Assembly inputs only; NOTHING is
+        # emailed to any carrier here (outbound contact stays human-approved
+        # downstream).
+        mm_item = (
+            await session.execute(
+                select(ReviewItemRow).where(
+                    col(ReviewItemRow.id) == body.market_matching_review_item_id,
+                    col(ReviewItemRow.tenant_id) == ctx.tenant_id,
+                )
+            )
+        ).scalar_one_or_none()
+        await audit.record(
+            session, ctx,
+            AuditEntry(
+                actor="human", who=ctx.user_id,
+                what=f"send: handoff to package assembly for {len(carrier_ids)} carrier(s)",
+                workflow=WORKFLOW_NAME, tenant_id=ctx.tenant_id, vertical=ctx.vertical,
+                detail={
+                    "market_matching_review_item_id": body.market_matching_review_item_id,
+                    "submission_id": mm_item.submission_id if mm_item else None,
+                    "carrier_ids": carrier_ids,
+                },
+            ),
+        )
 
     for carrier_id in carrier_ids:
         pipeline = _pipeline()

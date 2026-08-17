@@ -12,8 +12,10 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
+from core.audit import DefaultAuditService
+from core.common.dtos import AuditEntry as AuditEntryDTO
 from core.common.dtos import Ctx, WorkflowInput
-from core.common.enums import ReviewAction
+from core.common.enums import ReviewAction, Role
 from core.db import get_session
 from core.documents import LocalDocumentStore
 from core.extraction import DefaultExtractionService
@@ -26,7 +28,10 @@ from core.rules_engine import DefaultRulesEngine
 from core.tenancy.dependencies import get_ctx
 from verticals.es.agent_communication_hooks import fire_no_market_found
 from verticals.es.diligent_search_hooks import fire_diligent_search_required
-from verticals.es.workflows.market_matching.schema import MarketMatchingPayload
+from verticals.es.workflows.market_matching.schema import (
+    CarrierMatchOut,
+    MarketMatchingPayload,
+)
 from verticals.es.workflows.market_matching.service import (
     DEFAULT_WORKFLOW_N,
     WORKFLOW_NAME,
@@ -194,9 +199,99 @@ async def approve(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItemO
     return await _act(item_id, ReviewAction.APPROVE, ctx, session)
 
 
+class OverrideExclusionRequest(BaseModel):
+    """A senior/admin includes a HARD-EXCLUDED carrier in the shortlist anyway.
+    A typed reason is mandatory — an override never silently flips anything."""
+
+    carrier_id: str
+    reason: str
+
+
 @router.post("/{item_id}/override")
-async def override(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
-    return await _act(item_id, ReviewAction.OVERRIDE, ctx, session)
+async def override_exclusion(
+    item_id: str, body: OverrideExclusionRequest, ctx: CtxDep, session: SessionDep
+) -> ReviewItemOut:
+    """Moves one hard-excluded carrier into the selectable shortlist (audited).
+
+    The overridden carrier carries NO engine score (KB06 — the deterministic
+    score is engine output only; a manual override does not invent one) and
+    keeps the rule it broke, so downstream screens can show it was forced in.
+    """
+    if ctx.role not in (Role.SENIOR, Role.ADMIN):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "override requires a senior or admin role"
+        )
+    reason = body.reason.strip()
+    if not reason:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "a typed override reason is required"
+        )
+
+    item = (
+        await session.execute(
+            select(ReviewItemRow).where(
+                col(ReviewItemRow.id) == item_id, col(ReviewItemRow.tenant_id) == ctx.tenant_id
+            )
+        )
+    ).scalar_one_or_none()
+    if item is None or not item.output_package_id:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"no market-matching review item '{item_id}'"
+        )
+    pkg = (
+        await session.execute(
+            select(OutputPackageRow).where(col(OutputPackageRow.id) == item.output_package_id)
+        )
+    ).scalar_one_or_none()
+    if pkg is None or not pkg.payload:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "review item has no payload")
+
+    payload = MarketMatchingPayload(**pkg.payload)
+    excluded_row = next((e for e in payload.excluded if e.carrier_id == body.carrier_id), None)
+    if excluded_row is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"carrier '{body.carrier_id}' is not in this item's excluded list",
+        )
+
+    payload.excluded = [e for e in payload.excluded if e.carrier_id != body.carrier_id]
+    payload.matches.append(
+        CarrierMatchOut(
+            carrier_id=excluded_row.carrier_id,
+            carrier_name=excluded_row.carrier_name,
+            score=0.0,  # no engine score — manual inclusion, never AI/heuristic
+            missing=[],
+            flags=[f"Manually overridden: was hard-excluded by {excluded_row.rule}"],
+            overridden=True,
+            override_rule=excluded_row.rule,
+            override_reason=reason,
+        )
+    )
+    pkg.payload = payload.model_dump()
+    session.add(pkg)
+
+    await DefaultAuditService().record(
+        session, ctx,
+        AuditEntryDTO(
+            actor="human", who=ctx.user_id,
+            what=f"exclusion override: {excluded_row.carrier_name} ({excluded_row.rule})",
+            workflow=WORKFLOW_NAME, tenant_id=ctx.tenant_id, vertical=ctx.vertical,
+            detail={
+                "review_item_id": item_id,
+                "submission_id": item.submission_id,
+                "carrier_id": excluded_row.carrier_id,
+                "carrier_name": excluded_row.carrier_name,
+                "rule_overridden": excluded_row.rule,
+                "reason": reason,
+            },
+        ),
+    )
+    await session.commit()
+    await session.refresh(pkg)
+    return ReviewItemOut(
+        id=item.id, submission_id=item.submission_id, status=item.status.value,
+        payload=pkg.payload,
+    )
 
 
 @router.post("/{item_id}/escalate")
@@ -204,11 +299,8 @@ async def escalate(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItem
     return await _act(item_id, ReviewAction.ESCALATE, ctx, session)
 
 
-@router.post("/{item_id}/send")
-async def send(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
-    return await _act(item_id, ReviewAction.SEND, ctx, session)
-
-
-@router.post("/{item_id}/issue")
-async def issue(item_id: str, ctx: CtxDep, session: SessionDep) -> ReviewItemOut:
-    return await _act(item_id, ReviewAction.ISSUE, ctx, session)
+# NOTE: no /send endpoint — "sending" from Market Matching is the audited
+# handoff to Package Assembly (POST /package-assembly/run-from-market-matching
+# with carrier_ids), never a bare status flip and never a carrier email.
+# NOTE: no /issue endpoint — "issue" is a binder concept, not a Market Matching
+# action. Proceeding from here is the Send handoff to Package Assembly (FR-13).

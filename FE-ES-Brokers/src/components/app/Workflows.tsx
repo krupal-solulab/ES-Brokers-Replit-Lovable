@@ -8,6 +8,7 @@ import {
   listDocuments,
   listLiveInbox,
   listMarketMatching,
+  overrideMarketMatchingExclusion,
   runMarketMatching,
   type CarrierMatchOut,
   type DiligentSearchOut,
@@ -543,28 +544,73 @@ const STATUS_LABEL: Record<string, string> = {
 
 const ACTION_LABEL: Record<ReviewActionVerb, string> = {
   approve: "Approve",
-  override: "Override",
   escalate: "Escalate",
-  send: "Send",
-  issue: "Issue",
 };
 
 function scorePct(score: number): number {
   return Math.round(score * 100);
 }
 
+/** Human labels for the engine's deterministic score components (KB06 — the
+ * composite is engine output only; the FE just explains it). */
+const SCORE_COMPONENT_LABEL: Record<string, string> = {
+  class_fit_specificity: "Class-fit specificity",
+  completeness_score: "Submission completeness",
+  historical_hit_rate: "Historical hit rate",
+  appetite_confidence_weight: "Appetite confidence",
+  severity_margin: "Severity margin",
+};
+
+/** One-line hover breakdown for a ranked carrier row — every number comes from
+ * the engine's recorded components/weights, nothing is computed client-side
+ * beyond formatting. */
+function scoreBreakdownText(m: CarrierMatchOut): string | undefined {
+  if (m.overridden) return `Manually overridden (${m.override_rule ?? "hard exclusion"}) — no engine score`;
+  if (!m.score_components) return undefined;
+  const w = m.score_weights ?? {};
+  return Object.entries(m.score_components)
+    .map(
+      ([k, v]) =>
+        `${SCORE_COMPONENT_LABEL[k] ?? k}: ${Math.round(v * 100)}${w[k] != null ? ` (weight ${Math.round(w[k] * 100)}%)` : ""}`,
+    )
+    .join(" · ");
+}
+
 /** Derived only from fields the API actually returns (matches[]/excluded[]/diligent_search) —
  * there is no top-level recommendation field in MarketMatchingPayload to read instead. */
 function deriveOutcome(payload: MarketMatchingPayload | null | undefined): {
   label: string;
+  meaning: string;
   tone: "success" | "warn" | "danger";
 } {
-  if (!payload) return { label: "Not yet run", tone: "warn" };
-  if (payload.matches.length > 0) return { label: "Carriers matched", tone: "success" };
-  if (payload.excluded.length === 0 && payload.diligent_search.note === "not evaluated") {
-    return { label: "Missing ACORD — cannot evaluate", tone: "warn" };
+  if (!payload) return { label: "Not yet run", meaning: "Run matching to get an outcome.", tone: "warn" };
+  // Prefer the engine-recorded outcome code when present (newer payloads).
+  if (payload.outcome === "REQUEST_INFO") {
+    return {
+      label: "REQUEST_INFO",
+      meaning: "Missing readable class code / premium — cannot match yet",
+      tone: "warn",
+    };
   }
-  return { label: "No market found", tone: "danger" };
+  if (payload.matches.length > 0) {
+    return {
+      label: "MATCHES_FOUND",
+      meaning: "Carriers survived hard exclusion (MM-01..04)",
+      tone: "success",
+    };
+  }
+  if (payload.excluded.length === 0 && payload.diligent_search.note === "not evaluated") {
+    return {
+      label: "REQUEST_INFO",
+      meaning: "Missing readable class code / premium — cannot match yet",
+      tone: "warn",
+    };
+  }
+  return {
+    label: "NO_MATCH",
+    meaning: "Every carrier hard-excluded — never a \u201cbest available\u201d fallback (FR-11)",
+    tone: "danger",
+  };
 }
 
 export function SubmissionMarketMatching() {
@@ -584,12 +630,10 @@ export function SubmissionMarketMatching() {
   const items = (listQuery.data ?? []).filter(
     (i) => !/^submission_\d+$/.test(i.submission_id ?? ""),
   );
-  const selectedRow = items.find((i) => i.id === selectedId) ?? items[0];
-  const firstItemId = items[0]?.id;
-
-  useEffect(() => {
-    if (!selectedId && firstItemId) setSelectedId(firstItemId);
-  }, [firstItemId, selectedId]);
+  // No silent fallback: everything below is scoped to the ONE explicitly
+  // selected submission — nothing selected shows the empty state instead of
+  // another submission's data.
+  const selectedRow = items.find((i) => i.id === selectedId);
 
   const detailQuery = useQuery({
     queryKey: ["market-matching", "detail", selectedRow?.id],
@@ -611,11 +655,16 @@ export function SubmissionMarketMatching() {
     ]);
   }
 
-  function toggleCarrier(carrier: string) {
+  function toggleCarrier(carrierId: string) {
     setSelectedCarriers((prev) =>
-      prev.includes(carrier) ? prev.filter((c) => c !== carrier) : [...prev, carrier],
+      prev.includes(carrierId) ? prev.filter((c) => c !== carrierId) : [...prev, carrierId],
     );
   }
+
+  // Selection is per submission — switching submissions clears the shortlist.
+  useEffect(() => {
+    setSelectedCarriers([]);
+  }, [selectedId]);
 
   const [liveInboxOpen, setLiveInboxOpen] = useState(false);
   const liveInboxQuery = useQuery({
@@ -637,6 +686,38 @@ export function SubmissionMarketMatching() {
   });
 
   const outcome = deriveOutcome(payload);
+
+  // FR-13 "Send": creates the Package Assembly input for EXACTLY the broker's
+  // selected carriers (audited server-side: who/when/submission/carriers) and
+  // then navigates there. It never emails any carrier — outbound contact is a
+  // downstream, human-approved step.
+  const sendMutation = useMutation({
+    mutationFn: () =>
+      runPackageAssemblyFromMarketMatching(selectedRow!.id, undefined, selectedCarriers),
+    onSuccess: (created) => {
+      const names = (payload?.matches ?? [])
+        .filter((m) => selectedCarriers.includes(m.carrier_id))
+        .map((m) => m.carrier_name);
+      appendLog(
+        "You",
+        `Send — created ${created.length} Package Assembly input(s) for ${names.join(", ")}`,
+        `${selectedRow?.submission_id ?? selectedRow?.id} · audited handoff, no carrier emailed`,
+      );
+      toast.success(`Package Assembly input created for ${created.length} carrier(s)`);
+      queryClient.invalidateQueries({ queryKey: ["package-assembly"] });
+      navigate({
+        to: "/app/workflows/$slug",
+        params: { slug: "package-assembly" },
+        search: {
+          submissionId: selectedRow?.submission_id ?? selectedRow?.id,
+          carriers: selectedCarriers.join(","),
+          marketMatchingItemId: selectedRow?.id,
+        },
+      });
+    },
+    onError: (err: unknown) =>
+      toast.error(err instanceof Error ? err.message : "Send to Package Assembly failed"),
+  });
 
   return (
     <div className="mx-auto max-w-[1500px] animate-in fade-in-0 duration-500">
@@ -784,30 +865,16 @@ export function SubmissionMarketMatching() {
                   <div className="flex items-center gap-2">
                     <Button
                       variant="primary"
-                      disabled={selectedCarriers.length === 0}
+                      disabled={selectedCarriers.length === 0 || sendMutation.isPending}
                       title={
                         selectedCarriers.length === 0
                           ? "Select at least one carrier in Carrier ranking first"
-                          : undefined
+                          : "Creates the Package Assembly input for exactly the selected carriers (audited). Does NOT email any carrier — outbound contact stays human-approved downstream."
                       }
-                      onClick={() => {
-                        appendLog(
-                          "You",
-                          `Selected ${selectedCarriers.length} carrier${selectedCarriers.length === 1 ? "" : "s"} for packaging — ${selectedCarriers.join(", ")}`,
-                          `${selectedRow.submission_id ?? selectedRow.id} · proceeding to Package Assembly`,
-                        );
-                        navigate({
-                          to: "/app/workflows/$slug",
-                          params: { slug: "package-assembly" },
-                          search: {
-                            submissionId: selectedRow.submission_id ?? selectedRow.id,
-                            carriers: selectedCarriers.join(","),
-                            marketMatchingItemId: selectedRow.id,
-                          },
-                        });
-                      }}
+                      onClick={() => sendMutation.mutate()}
                     >
-                      Proceed to package
+                      {sendMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Send to Package Assembly
                       {selectedCarriers.length > 0 ? ` (${selectedCarriers.length})` : ""}{" "}
                       <ArrowRight className="h-4 w-4" />
                     </Button>
@@ -821,25 +888,51 @@ export function SubmissionMarketMatching() {
                     sub="Review-item status"
                     tone="success"
                   />
-                  <MetricTile
-                    label="Top score"
-                    value={
-                      payload && payload.matches.length > 0
-                        ? scorePct(payload.matches[0].score).toString()
-                        : "—"
-                    }
-                    sub={
-                      payload?.matches[0] ? payload.matches[0].carrier_name : "No carrier matched"
-                    }
-                    tone={payload && payload.matches.length > 0 ? "success" : "warn"}
-                  />
+                  <div title="Relative composite ranking score (class-fit specificity + submission completeness + historical hit rate + appetite confidence + severity margin) — NOT a probability of binding.">
+                    <MetricTile
+                      label="Top fit score"
+                      value={
+                        payload && payload.matches.length > 0
+                          ? scorePct(payload.matches[0].score).toString()
+                          : "—"
+                      }
+                      sub={
+                        payload?.matches[0]
+                          ? `${payload.matches[0].carrier_name} · relative ranking — not a probability of binding`
+                          : "No carrier matched"
+                      }
+                      tone={payload && payload.matches.length > 0 ? "success" : "warn"}
+                    />
+                  </div>
                   <MetricTile
                     label="Outcome"
                     value={outcome.label}
-                    sub={`${payload?.matches.length ?? 0} matched · ${payload?.excluded.length ?? 0} excluded`}
+                    sub={`${outcome.meaning} · ${payload?.matches.length ?? 0} matched, ${payload?.excluded.length ?? 0} excluded`}
                     tone={outcome.tone}
                   />
                 </div>
+
+                {payload?.matches[0]?.score_components && (
+                  <div className="mt-3 rounded-lg border border-border bg-secondary/30 p-3">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Top fit score breakdown — {payload.matches[0].carrier_name} (deterministic
+                      engine components, KB06)
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-5">
+                      {Object.entries(payload.matches[0].score_components).map(([k, v]) => (
+                        <div key={k} className="rounded-md border border-border bg-paper p-2">
+                          <div className="text-[10px] text-muted-foreground">
+                            {SCORE_COMPONENT_LABEL[k] ?? k}
+                            {payload.matches[0].score_weights?.[k] != null
+                              ? ` · w ${Math.round((payload.matches[0].score_weights[k] ?? 0) * 100)}%`
+                              : ""}
+                          </div>
+                          <div className="font-mono text-sm">{Math.round(v * 100)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </Panel>
 
               <Panel>
@@ -873,11 +966,13 @@ export function SubmissionMarketMatching() {
                       {tab === "Documents" && <DocumentsTab itemId={selectedRow.id} />}
                       {tab === "Carrier ranking" && (
                         <CarrierRankingTab
+                          itemId={selectedRow.id}
                           matches={payload.matches}
                           excluded={payload.excluded}
                           diligentSearch={payload.diligent_search}
                           selected={selectedCarriers}
                           onToggle={toggleCarrier}
+                          onActed={appendLog}
                         />
                       )}
                       {tab === "Match rules" && <MatchRulesTab excluded={payload.excluded} />}
@@ -885,8 +980,7 @@ export function SubmissionMarketMatching() {
                         <MatchRecommendationTab
                           itemId={selectedRow.id}
                           outcome={outcome}
-                          matchCount={payload.matches.length}
-                          excludedCount={payload.excluded.length}
+                          payload={payload}
                           onActed={appendLog}
                         />
                       )}
@@ -979,18 +1073,47 @@ function DocumentsTab({ itemId }: { itemId: string }) {
 }
 
 function CarrierRankingTab({
+  itemId,
   matches,
   excluded,
   diligentSearch,
   selected,
   onToggle,
+  onActed,
 }: {
+  itemId: string;
   matches: CarrierMatchOut[];
   excluded: ExcludedCarrierOut[];
   diligentSearch: DiligentSearchOut;
   selected: string[];
-  onToggle: (carrier: string) => void;
+  onToggle: (carrierId: string) => void;
+  onActed: (who: string, what: string, ctx: string) => void;
 }) {
+  const queryClient = useQueryClient();
+  // Exclusion override (senior/admin, audited): which excluded carrier has its
+  // reason box open, and the typed reason. A reason is mandatory.
+  const [overridingId, setOverridingId] = useState<string | null>(null);
+  const [overrideReason, setOverrideReason] = useState("");
+
+  const overrideMutation = useMutation({
+    mutationFn: ({ carrierId, reason }: { carrierId: string; reason: string }) =>
+      overrideMarketMatchingExclusion(itemId, carrierId, reason),
+    onSuccess: (_item, vars) => {
+      const carrier = excluded.find((e) => e.carrier_id === vars.carrierId);
+      onActed(
+        "You",
+        `Override — included ${carrier?.carrier_name ?? vars.carrierId} despite ${carrier?.rule ?? "hard exclusion"}`,
+        `Reason: ${vars.reason} · audited`,
+      );
+      toast.success("Carrier moved into the selectable shortlist (audited override)");
+      setOverridingId(null);
+      setOverrideReason("");
+      queryClient.invalidateQueries({ queryKey: ["market-matching", "detail", itemId] });
+    },
+    onError: (err: unknown) =>
+      toast.error(err instanceof Error ? err.message : "Override failed"),
+  });
+
   return (
     <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
       <div>
@@ -1008,23 +1131,30 @@ function CarrierRankingTab({
         ) : (
           <ul className="space-y-2">
             {matches.map((m) => {
-              const isChecked = selected.includes(m.carrier_name);
+              const isChecked = selected.includes(m.carrier_id);
               return (
                 <li
                   key={m.carrier_id}
+                  title={scoreBreakdownText(m)}
                   className={`rounded-lg border p-3 text-sm ${isChecked ? "border-accent/40 bg-accent/5" : "border-border"}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Checkbox
                         checked={isChecked}
-                        onCheckedChange={() => onToggle(m.carrier_name)}
+                        onCheckedChange={() => onToggle(m.carrier_id)}
                         aria-label={`Select ${m.carrier_name} for packaging`}
                       />
                       <span className="font-medium">{m.carrier_name}</span>
+                      {m.overridden && (
+                        <Chip tone="warn">Overridden — {m.override_rule ?? "hard exclusion"}</Chip>
+                      )}
                     </div>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {scorePct(m.score)}
+                    <span
+                      className="font-mono text-xs text-muted-foreground"
+                      title={scoreBreakdownText(m)}
+                    >
+                      {m.overridden ? "no engine score" : scorePct(m.score)}
                     </span>
                   </div>
                   {m.flags.length > 0 && (
@@ -1057,6 +1187,57 @@ function CarrierRankingTab({
                     <Chip tone="danger">{e.rule}</Chip>
                   </div>
                   <div className="mt-1 text-[11px] text-muted-foreground">{e.reason}</div>
+                  {overridingId === e.carrier_id ? (
+                    <div className="mt-2 space-y-2">
+                      <textarea
+                        value={overrideReason}
+                        onChange={(ev) => setOverrideReason(ev.target.value)}
+                        placeholder="Typed reason required — why include this carrier despite the hard exclusion?"
+                        className="w-full rounded-md border border-border bg-paper p-2 text-xs"
+                        rows={2}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="danger"
+                          className="!py-1 !text-xs"
+                          disabled={!overrideReason.trim() || overrideMutation.isPending}
+                          onClick={() =>
+                            overrideMutation.mutate({
+                              carrierId: e.carrier_id,
+                              reason: overrideReason.trim(),
+                            })
+                          }
+                        >
+                          {overrideMutation.isPending && (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          )}
+                          Confirm override
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="!py-1 !text-xs"
+                          onClick={() => {
+                            setOverridingId(null);
+                            setOverrideReason("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      className="mt-2 !py-1 !text-xs"
+                      title="Senior/admin only: include this hard-excluded carrier in the shortlist anyway. Requires a typed reason; the override is audited (carrier, rule, reason, user)."
+                      onClick={() => {
+                        setOverridingId(e.carrier_id);
+                        setOverrideReason("");
+                      }}
+                    >
+                      Override exclusion…
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1130,17 +1311,48 @@ function MatchRulesTab({ excluded }: { excluded: ExcludedCarrierOut[] }) {
   );
 }
 
+/** Grounded recommendation lines built ONLY from the deterministic engine
+ * output (score components, `missing`, `flags`, `excluded.rule/reason`) —
+ * never invented text, and never restating the score as a probability. */
+function buildRecommendationLines(payload: MarketMatchingPayload): {
+  approach: string[];
+  hold: string[];
+  excluded: string[];
+} {
+  const ranked = payload.matches.filter((m) => !m.overridden);
+  const approach: string[] = [];
+  const hold: string[] = [];
+
+  for (const m of ranked) {
+    if (m.missing.length > 0) {
+      hold.push(`Hold ${m.carrier_name} pending: ${m.missing.join("; ")}`);
+      continue;
+    }
+    const comps = m.score_components ?? {};
+    // Name the carrier's strongest engine components as its score-driving reasons.
+    const drivers = Object.entries(comps)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([k, v]) => `${(SCORE_COMPONENT_LABEL[k] ?? k).toLowerCase()} ${Math.round(v * 100)}`);
+    const flagNote = m.flags.length > 0 ? ` (note: ${m.flags.join("; ")})` : "";
+    approach.push(
+      `Approach ${m.carrier_name}${drivers.length > 0 ? ` — ${drivers.join(", ")}` : ""}${flagNote}`,
+    );
+  }
+
+  const excluded = payload.excluded.map((e) => `${e.carrier_name} — ${e.rule}: ${e.reason}`);
+  return { approach, hold, excluded };
+}
+
 function MatchRecommendationTab({
   itemId,
   outcome,
-  matchCount,
-  excludedCount,
+  payload,
   onActed,
 }: {
   itemId: string;
-  outcome: { label: string; tone: "success" | "warn" | "danger" };
-  matchCount: number;
-  excludedCount: number;
+  outcome: { label: string; meaning: string; tone: "success" | "warn" | "danger" };
+  payload: MarketMatchingPayload;
   onActed: (who: string, what: string, ctx: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -1182,16 +1394,64 @@ function MatchRecommendationTab({
             <AlertTriangle className="h-5 w-5 text-warn" />
           )}
           <div className="font-serif text-xl">{outcome.label}</div>
+          <span className="text-[11px] text-muted-foreground">{outcome.meaning}</span>
         </div>
-        <p className="mt-3 text-sm text-foreground">
-          {matchCount} carrier(s) matched, {excludedCount} excluded on the current panel — derived
-          directly from <code>GET /api/es/market-matching/{itemId}</code>.
-        </p>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          There's no LLM-drafted narrative shown here: the pipeline computes one internally via{" "}
-          <code>core.llm</code> (see <code>service.py</code>'s <code>draft()</code>), but it isn't
-          persisted or returned by this endpoint today — so this summary is a plain client-side
-          count, not the AI's own written recommendation.
+        {(() => {
+          const rec = buildRecommendationLines(payload);
+          if (rec.approach.length === 0 && rec.hold.length === 0) {
+            return (
+              <p className="mt-3 text-sm text-foreground">
+                No recommendation basis: {outcome.label === "NO_MATCH"
+                  ? "every carrier on the panel was hard-excluded — there is no \u201cbest available\u201d fallback (FR-11)."
+                  : "the engine could not rank any carrier for this submission yet."}
+              </p>
+            );
+          }
+          return (
+            <div className="mt-3 space-y-3 text-sm">
+              {rec.approach.length > 0 && (
+                <ul className="space-y-1.5">
+                  {rec.approach.map((line) => (
+                    <li key={line} className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {rec.hold.length > 0 && (
+                <ul className="space-y-1.5">
+                  {rec.hold.map((line) => (
+                    <li key={line} className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {rec.excluded.length > 0 && (
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Excluded
+                  </div>
+                  <ul className="mt-1 space-y-1 text-[12px] text-muted-foreground">
+                    {rec.excluded.map((line) => (
+                      <li key={line} className="flex items-start gap-2">
+                        <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          Every line above traces to a recorded engine field (score components,{" "}
+          <code>missing</code>, <code>flags</code>, <code>excluded.rule/reason</code>) from{" "}
+          <code>GET /api/es/market-matching/{itemId}</code> — the deterministic ranking is never
+          altered or restated as a probability here (KB06).
         </p>
       </div>
       <div className="rounded-xl border border-border p-4">
@@ -1199,26 +1459,24 @@ function MatchRecommendationTab({
           Review action
         </div>
         <div className="mt-3 space-y-2 text-sm">
-          {(["approve", "escalate", "override", "send", "issue"] as ReviewActionVerb[]).map(
-            (action) => (
-              <Button
-                key={action}
-                variant={
-                  action === "approve" ? "primary" : action === "override" ? "danger" : "secondary"
-                }
-                className="w-full justify-center"
-                disabled={actMutation.isPending}
-                onClick={() => actMutation.mutate(action)}
-              >
-                {pendingAction === action && <Loader2 className="h-4 w-4 animate-spin" />}
-                {ACTION_LABEL[action]}
-              </Button>
-            ),
-          )}
+          {(["approve", "escalate"] as ReviewActionVerb[]).map((action) => (
+            <Button
+              key={action}
+              variant={action === "approve" ? "primary" : "secondary"}
+              className="w-full justify-center"
+              disabled={actMutation.isPending}
+              onClick={() => actMutation.mutate(action)}
+            >
+              {pendingAction === action && <Loader2 className="h-4 w-4 animate-spin" />}
+              {ACTION_LABEL[action]}
+            </Button>
+          ))}
         </div>
         <div className="mt-4 text-[11px] text-muted-foreground">
-          Junior role can approve/escalate; override/send/issue are senior/admin-only, enforced
-          server-side — expect a 403 toast here with the seeded junior demo user.
+          Sending to a carrier never happens from this screen: use the audited{" "}
+          <em>Send to Package Assembly</em> handoff above (senior/admin), and override a hard
+          exclusion from the Carrier ranking tab — it requires a typed reason and is audited.
+          "Issue" is a binder concept and doesn't exist here.
         </div>
       </div>
     </div>
@@ -1632,7 +1890,12 @@ export function PackageAssembly({ search = {} }: { search?: Record<string, unkno
   }
 
   const runFromMarketMatchingMutation = useMutation({
-    mutationFn: () => runPackageAssemblyFromMarketMatching(upstreamMarketMatchingItemId!),
+    mutationFn: () =>
+      runPackageAssemblyFromMarketMatching(
+        upstreamMarketMatchingItemId!,
+        undefined,
+        upstreamCarriers.length > 0 ? upstreamCarriers : undefined,
+      ),
     onSuccess: (createdItems) => {
       queryClient.invalidateQueries({ queryKey: ["package-assembly"] });
       toast.success(
@@ -1666,7 +1929,13 @@ export function PackageAssembly({ search = {} }: { search?: Record<string, unkno
               : upstreamSubmissionId}
             .
           </div>
-          {upstreamMarketMatchingItemId ? (
+          {upstreamCarriers.length > 0 ? (
+            // Arrived via the audited Send handoff — packages were already
+            // created before navigation; no re-assembly button (would duplicate).
+            <span className="font-medium text-success">
+              Packages already created via Send — see the list below.
+            </span>
+          ) : upstreamMarketMatchingItemId ? (
             <Button
               variant="primary"
               className="!py-1 !text-xs"

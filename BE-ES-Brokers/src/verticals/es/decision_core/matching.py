@@ -421,11 +421,29 @@ async def decide_market_match(
     matches, exclusions = await rank_carriers(session, ctx, engine, panel, model)
     diligent_search = _diligent_search_flag(model)
 
+    # Explicit outcome code (FR-11): MATCHES_FOUND (carriers survived hard
+    # exclusion), REQUEST_INFO (missing readable class code / premium — cannot
+    # match yet), NO_MATCH (every carrier hard-excluded — never a "best
+    # available" fallback).
+    submission_class = _first_field(model, "acord.class_code") or ""
+    premium = _to_number(_first_field(model, "acord.indicated_premium_target") or "")
+    if matches:
+        outcome_code = "MATCHES_FOUND"
+    elif not submission_class or premium is None:
+        outcome_code = "REQUEST_INFO"
+    else:
+        outcome_code = "NO_MATCH"
+
     outcome = DecisionOutcome.PROCEED if matches else DecisionOutcome.DECLINE
     rationale = (
         f"{len(matches)} carrier(s) matched on current panel."
         if matches
-        else "No carrier on the current panel fits this submission — no market found."
+        else (
+            "Cannot match yet — missing readable class code and/or premium target; "
+            "request the information from the broker."
+            if outcome_code == "REQUEST_INFO"
+            else "No carrier on the current panel fits this submission — no market found."
+        )
     )
 
     return Decision(
@@ -433,11 +451,22 @@ async def decide_market_match(
         score=matches[0].score if matches else None,
         rationale=rationale,
         details={
+            "outcome": outcome_code,
             "matches": [
                 {
                     "carrier_id": m.carrier_id,
                     "carrier_name": m.carrier_name,
                     "score": m.score,
+                    # Deterministic engine components (KB06) — surfaced so the FE
+                    # can explain the composite score; never AI-computed.
+                    "score_components": {
+                        "class_fit_specificity": m.class_fit_specificity,
+                        "completeness_score": m.completeness_score,
+                        "historical_hit_rate": m.historical_hit_rate,
+                        "appetite_confidence_weight": m.appetite_confidence_weight,
+                        "severity_margin": m.severity_margin,
+                    },
+                    "score_weights": dict(_WEIGHTS),
                     "missing": m.missing,
                     "flags": m.flags,
                 }
