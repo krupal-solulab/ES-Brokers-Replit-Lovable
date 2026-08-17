@@ -1,0 +1,21 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "main",
+    "main-backup",
+    "mock-data",
+    "origin"
+  ],
+  "parent": {
+    "main": null,
+    "main-backup": "main",
+    "mock-data": "main",
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "main-backup",
+    "mock-data",
+    "origin"
+  ]
+}
