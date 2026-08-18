@@ -65,6 +65,9 @@ from core.common.dtos import Ctx, RawDocument
 from core.common.enums import DocumentKind
 from core.config import get_settings
 from core.documents.store import LocalDocumentStore
+# Matches this workflow's service.DEFAULT_WORKFLOW_N (imported lazily to avoid a
+# service<->live_ingestion circular import).
+_DEFAULT_WORKFLOW_N = 16
 from core.ingestion.connectors import (
     ConnectorNotConnectedError,
     LiveNangoConnectorService,
@@ -99,10 +102,11 @@ def _parse_money(value: Any) -> float | None:
 
 
 def _require_live_connector(session: AsyncSession) -> LiveNangoConnectorService:
-    connector = build_connector_service(session=session)
-    if not isinstance(connector, LiveNangoConnectorService):
-        raise ConnectorNotConnectedError(get_settings().nango_integration_mail)
-    return connector
+    from core.ingestion.connectors import unwrap_live_connector
+
+    return unwrap_live_connector(
+        build_connector_service(workflow_n=_DEFAULT_WORKFLOW_N, session=session)
+    )
 
 
 async def _binder_issuance_rows(session: AsyncSession, ctx: Ctx) -> list[OutputPackageRow]:

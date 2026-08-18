@@ -204,7 +204,7 @@ async def export_to_sheet(item_id: str, ctx: CtxDep, session: SessionDep) -> Exp
     payload = PipelineReportPayload(**pkg.payload)
 
     sheet_id = await resolve_sheet_id(session, ctx.tenant_id, get_settings())
-    connector = build_connector_service(session=session, tenant_id=ctx.tenant_id)
+    connector = build_connector_service(workflow_n=DEFAULT_WORKFLOW_N, session=session, tenant_id=ctx.tenant_id)
     row = [
         payload.report_id,
         payload.period,

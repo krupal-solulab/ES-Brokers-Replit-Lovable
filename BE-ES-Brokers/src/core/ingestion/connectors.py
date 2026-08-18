@@ -729,6 +729,65 @@ class LiveNangoConnectorService:
         return str(resp.json().get("ts", ""))
 
 
+class StaticFallbackConnectorService:
+    """Live connector with a product-wide static-data fallback: every method
+    first tries the real Nango-proxied call; a ``ConnectorNotConnectedError``
+    falls back to the SAME method on the existing fixture-backed
+    ``MockConnectorService`` (never a parallel data source) instead of
+    surfacing a 428. The Settings page still shows real connection status —
+    it reads ``/api/core/integrations/connections`` directly, not this."""
+
+    # Outbound/writeback methods are NOT eligible for the static fallback:
+    # writing to the mock's in-memory store while the user believes a real
+    # send/upload happened would be a silent lie. These still raise
+    # ConnectorNotConnectedError, which routers already translate into an
+    # explicit "skipped — not connected" status.
+    _WRITEBACK_METHODS = frozenset(
+        {
+            "send_email",
+            "append_rows",
+            "put_file",
+            "upload_file",
+            "create_event",
+            "send_slack_message",
+        }
+    )
+
+    def __init__(self, live: LiveNangoConnectorService, workflow_n: int) -> None:
+        self._live = live
+        self._mock = MockConnectorService(workflow_n=workflow_n)
+
+    def __getattr__(self, name: str):
+        live_attr = getattr(self._live, name)
+        if not callable(live_attr):
+            return live_attr
+        mock_attr = (
+            None if name in self._WRITEBACK_METHODS else getattr(self._mock, name, None)
+        )
+
+        async def call(*args, **kwargs):
+            try:
+                return await live_attr(*args, **kwargs)
+            except ConnectorNotConnectedError:
+                if mock_attr is None:
+                    raise
+                return await mock_attr(*args, **kwargs)
+
+        return call
+
+
+def unwrap_live_connector(connector: object) -> LiveNangoConnectorService:
+    """For the few live-ingestion helpers that genuinely require the live
+    Nango service (no static equivalent): accepts either the bare live service
+    or the StaticFallbackConnectorService wrapper (unwrapping it), and raises
+    ``ConnectorNotConnectedError`` for anything else (mock/static mode)."""
+    if isinstance(connector, StaticFallbackConnectorService):
+        return connector._live
+    if isinstance(connector, LiveNangoConnectorService):
+        return connector
+    raise ConnectorNotConnectedError(get_settings().nango_integration_mail)
+
+
 def build_connector_service(
     settings: Settings | None = None,
     *,
@@ -736,7 +795,10 @@ def build_connector_service(
     session: AsyncSession | None = None,
     tenant_id: str | None = None,
 ) -> ConnectorService:
-    """Factory: ``CONNECTORS_MODE=mock`` -> fixtures; ``live`` -> real Nango proxy.
+    """Factory: ``CONNECTORS_MODE=mock`` -> fixtures; ``live`` -> real Nango proxy
+    wrapped in the product-wide static-data fallback (``core.data_mode``): a
+    disconnected connector or an out-of-quota LLM provider serves the same
+    fixture data as mock mode instead of erroring.
 
     ``session`` is only needed by the live path (to resolve the tenant's Connection
     row) — it's optional and ignored by MockConnectorService, so every existing
@@ -754,10 +816,18 @@ def build_connector_service(
     ``drive_writeback.py``). Raising here and letting each call site decide is
     the safe behavior; see ``docs/CONNECTORS_NANGO.md``.
     """
+    from core.data_mode import get_current_data_mode, llm_quota_active  # avoids cycle
+
+    current = get_current_data_mode()  # request-scoped, set by main.py middleware
+    if current is not None and current.mode == "static":
+        return MockConnectorService(workflow_n=workflow_n)
+
     settings = settings or get_settings()
     mode = settings.connectors_mode
     if tenant_id is not None:
         mode = get_effective_setting(tenant_id, "connectors_mode", mode)
-    if mode == "live":
-        return LiveNangoConnectorService(settings, session)
+    if mode == "live" and not llm_quota_active():
+        return StaticFallbackConnectorService(
+            LiveNangoConnectorService(settings, session), workflow_n
+        )
     return MockConnectorService(workflow_n=workflow_n)

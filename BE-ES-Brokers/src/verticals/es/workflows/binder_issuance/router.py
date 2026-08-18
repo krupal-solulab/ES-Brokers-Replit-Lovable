@@ -204,7 +204,7 @@ async def _maybe_create_renewal_reminder(
     if old_status == "SENT" or new_status != "SENT":
         return False
     confirmed_terms = (new_payload.get("carrier_confirmation") or {}).get("confirmed_terms") or {}
-    connector = build_connector_service(session=session, tenant_id=ctx.tenant_id)
+    connector = build_connector_service(workflow_n=DEFAULT_WORKFLOW_N, session=session, tenant_id=ctx.tenant_id)
     result = await try_create_renewal_reminder(
         connector, ctx,
         named_insured=new_payload.get("named_insured") or "",
@@ -231,7 +231,7 @@ async def _maybe_archive_issued_policy(
         return False
     named_insured = new_payload.get("named_insured") or "policy"
     bind_id = new_payload.get("bind_id", "")
-    connector = build_connector_service(session=session, tenant_id=ctx.tenant_id)
+    connector = build_connector_service(workflow_n=DEFAULT_WORKFLOW_N, session=session, tenant_id=ctx.tenant_id)
     result = await try_archive_document(
         connector, ctx,
         filename=f"{named_insured} - Issued Policy - {bind_id}.txt",
@@ -603,7 +603,7 @@ async def add_to_calendar(
             status.HTTP_404_NOT_FOUND, f"no obligation '{body.description}' for this item"
         )
 
-    connector = build_connector_service(session=session, tenant_id=ctx.tenant_id)
+    connector = build_connector_service(workflow_n=DEFAULT_WORKFLOW_N, session=session, tenant_id=ctx.tenant_id)
     result = await try_create_obligation_reminder(
         connector, ctx,
         named_insured=payload.named_insured or "policy",

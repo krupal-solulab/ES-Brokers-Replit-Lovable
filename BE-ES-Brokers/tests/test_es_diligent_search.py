@@ -1,6 +1,6 @@
 """E&S Diligent Search & Compliance Documentation eval test — proves the
 pipeline + router against the REAL Workflow_17 dataset (originally
-``Data sets/Workflow 8/diligent_search_dataset``, copied to
+``Data sets/Workflow_17/test_dataset``, copied to
 ``TEST_DATA_ROOT/Workflow_17/test_dataset`` per DATA_AND_FIXTURES.md).
 
 Pytest-discovered here (not under src/verticals/es/...) — see
@@ -14,6 +14,8 @@ highest-stakes success criterion in the entire vertical.
 from __future__ import annotations
 
 import pytest
+
+from fixtures.loader import dataset_dir as _bundled_dataset_dir
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel, col, select
 
@@ -46,8 +48,8 @@ from verticals.es.workflows.market_matching.router import run_market_matching
 
 # Applied individually — FR-8 unit tests run without TEST_DATA_ROOT.
 _needs_fixtures = pytest.mark.skipif(
-    not get_settings().test_data_root,
-    reason="TEST_DATA_ROOT not set; real Workflow_17 fixtures unavailable",
+    _bundled_dataset_dir(17) is None,
+    reason="Workflow_17 fixture dataset not found (TEST_DATA_ROOT or bundled Data sets)",
 )
 
 

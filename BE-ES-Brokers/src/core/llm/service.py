@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Protocol
-
-log = logging.getLogger(__name__)
 
 from core.common.dtos import Citation, Ctx, Draft, ExtractedValue
 from core.config import Settings, get_settings
@@ -50,6 +47,24 @@ class MockLLMProvider:
         return f"[mock:{model}] Draft grounded in provided facts.\n{user}"
 
 
+def _is_quota_error(exc: Exception) -> bool:
+    """OpenAI insufficient_quota / 429 *billing* errors — the signals that flip
+    the product-wide static-data fallback (core.data_mode reason c). A plain
+    429 rate limit (retryable, not a billing problem) does NOT qualify."""
+    text = str(exc)
+    if (
+        "insufficient_quota" in text
+        or "exceeded your current quota" in text
+        or "billing_hard_limit_reached" in text
+    ):
+        return True
+    code = getattr(exc, "code", None)
+    if code in ("insufficient_quota", "billing_hard_limit_reached"):
+        return True
+    # HTTP 402 Payment Required — unambiguous billing failure.
+    return getattr(exc, "status_code", None) == 402
+
+
 class OpenAIProvider:
     """Thin wrapper over the official ``openai`` async SDK. Client is created lazily so
     importing this module never requires a key."""
@@ -66,6 +81,13 @@ class OpenAIProvider:
         return self._client
 
     async def complete(self, *, model: str, system: str, user: str) -> str:
+        from core.data_mode import llm_quota_active, note_llm_quota_error
+
+        # Product-wide static fallback: skip the live call entirely while the
+        # quota flag is active, and set the flag (then fall back) when a live
+        # call fails on billing — deterministic output, never a crash.
+        if llm_quota_active():
+            return await MockLLMProvider().complete(model=model, system=system, user=user)
         client = self._get_client()
         try:
             resp = await client.chat.completions.create(  # type: ignore[attr-defined]
@@ -76,12 +98,12 @@ class OpenAIProvider:
                 ],
                 temperature=0,
             )
-            return resp.choices[0].message.content or ""
-        except Exception as exc:  # noqa: BLE001 — any OpenAI failure (quota, auth, rate
-            # limit, network, ...) falls back to the offline mock rather than 500ing
-            # a workflow run.
-            log.warning("OpenAI completion failed (%s); falling back to MockLLMProvider.", exc)
-            return await MockLLMProvider().complete(model=model, system=system, user=user)
+        except Exception as exc:  # noqa: BLE001 — inspect, re-raise if not billing
+            if _is_quota_error(exc):
+                note_llm_quota_error()
+                return await MockLLMProvider().complete(model=model, system=system, user=user)
+            raise
+        return resp.choices[0].message.content or ""
 
 
 class LLMService:
@@ -121,11 +143,31 @@ class LLMService:
                 raise ValueError(f"fabricated citation not grounded in facts: {c.filename}")
 
 
-def build_llm_service(settings: Settings | None = None) -> LLMService:
-    """Factory: real OpenAI provider when a key is configured, else the mock."""
+def build_llm_service(
+    settings: Settings | None = None, *, tenant_id: str | None = None
+) -> LLMService:
+    """Factory: real OpenAI provider when a key is configured, else the mock.
+
+    Consults ``core.data_mode``: in static data mode (effective connectors_mode
+    "mock" for the tenant, or an active LLM-quota flag) NO live LLM calls are
+    made — the deterministic mock provider is used, matching the fixture data
+    the rest of the product serves in that mode."""
+    from core.data_mode import (
+        effective_connectors_mode,
+        get_current_data_mode,
+        llm_quota_active,
+    )
+
     settings = settings or get_settings()
+    current = get_current_data_mode()  # request-scoped, set by main.py middleware
     provider: LLMProvider
-    if settings.openai_api_key and settings.openai_api_key != "sk-...":
+    if (
+        (current is None or current.mode != "static")
+        and settings.openai_api_key
+        and settings.openai_api_key != "sk-..."
+        and effective_connectors_mode(tenant_id) != "mock"
+        and not llm_quota_active()
+    ):
         provider = OpenAIProvider(settings.openai_api_key)
     else:
         provider = MockLLMProvider()

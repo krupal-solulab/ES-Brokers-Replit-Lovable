@@ -54,7 +54,7 @@ def _pipeline(session: AsyncSession, tenant_id: str | None = None) -> MarketMatc
         ),
         extraction=DefaultExtractionService(),
         rules_engine=DefaultRulesEngine(),
-        llm=build_llm_service(),
+        llm=build_llm_service(tenant_id=tenant_id),
         documents=LocalDocumentStore(),
         workflow_n=DEFAULT_WORKFLOW_N,
     )

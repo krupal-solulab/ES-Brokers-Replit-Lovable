@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import Settings, get_settings
+from core.data_mode import invalidate_connection_cache
 from core.db import get_session
 from core.ingestion import extract_folder_id, extract_sheet_id
 from core.integrations.repository import get_connection, list_connections, upsert_connection
@@ -116,6 +117,7 @@ async def confirm_connection(
         nango_connection_id=body.nango_connection_id,
         status="connected",
     )
+    invalidate_connection_cache(ctx.tenant_id)  # flip data mode immediately
     return ConnectionOut(
         provider=row.provider, status=row.status, sheet_id=row.sheet_id, folder_id=row.folder_id, channel_id=row.channel_id
     )
@@ -133,6 +135,7 @@ async def get_connections(ctx: CtxDep, session: SessionDep) -> list[ConnectionOu
 @router.post("/connections/{provider}/disconnect")
 async def disconnect(provider: str, ctx: CtxDep, session: SessionDep) -> ConnectionOut:
     row = await upsert_connection(session, ctx.tenant_id, provider, status="disconnected")
+    invalidate_connection_cache(ctx.tenant_id)  # flip data mode immediately
     return ConnectionOut(
         provider=row.provider, status=row.status, sheet_id=row.sheet_id, folder_id=row.folder_id, channel_id=row.channel_id
     )

@@ -18,11 +18,11 @@ log = logging.getLogger(__name__)
 
 # Carrier-profile JSON files shipped with the repo — used when TEST_DATA_ROOT
 # is absent (dev after a DB reset, CI without fixture mounts, etc.).
-# Path: <repo_root>/Data sets/Workflow 1/market_matching_dataset/carrier_profiles/
+# Path: <repo_root>/Mock-Data-ES-Broker/Workflow 1/market_matching_dataset/carrier_profiles/
 # __file__ = src/verticals/es/decision_core/carrier_profiles.py  → parents[4] = repo root
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _BUNDLED_CARRIER_DIR = (
-    _REPO_ROOT / "Data sets" / "Workflow 1" / "market_matching_dataset" / "carrier_profiles"
+    _REPO_ROOT / "Mock-Data-ES-Broker" / "Workflow 1" / "market_matching_dataset" / "carrier_profiles"
 )
 
 
@@ -67,16 +67,7 @@ class CarrierProfile:
     ceiling_type: str | None = None  # "hard" | "soft" | None (unset -> heuristic)
 
 
-def _dataset_dir(n: int) -> Path | None:
-    root = get_settings().test_data_root
-    if not root:
-        log.warning("TEST_DATA_ROOT is not set; returning no carrier profiles.")
-        return None
-    dataset = Path(root) / f"Workflow_{n}" / "test_dataset"
-    if not dataset.is_dir():
-        log.warning("Fixture dataset not found at %s; returning no carrier profiles.", dataset)
-        return None
-    return dataset
+from fixtures.loader import dataset_dir as _dataset_dir  # shared resolver (bundled fallback)
 
 
 def _to_profile(raw: dict[str, object]) -> CarrierProfile:
@@ -110,7 +101,7 @@ def _locate_carrier_panel_dir(n: int) -> Path | None:
 
     Priority:
     1. ``TEST_DATA_ROOT/Workflow_{n}/test_dataset/carrier_profiles/``
-    2. Repo-bundled ``Data sets/Workflow 1/market_matching_dataset/carrier_profiles/``
+    2. Repo-bundled ``Mock-Data-ES-Broker/Workflow 1/market_matching_dataset/carrier_profiles/``
        (always present in the repo; no env var needed).
 
     Returns ``None`` (with a warning) only when neither path exists.

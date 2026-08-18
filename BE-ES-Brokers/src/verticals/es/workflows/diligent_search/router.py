@@ -297,7 +297,7 @@ async def save_to_drive(
             status.HTTP_409_CONFLICT, f"no generated document for state '{body.state}' yet"
         )
 
-    connector = build_connector_service(session=session, tenant_id=ctx.tenant_id)
+    connector = build_connector_service(workflow_n=DEFAULT_WORKFLOW_N, session=session, tenant_id=ctx.tenant_id)
     named_insured = payload.named_insured or "submission"
     filename = f"{named_insured} - Diligent Search - {body.state}.txt"
     result = await try_archive_document(

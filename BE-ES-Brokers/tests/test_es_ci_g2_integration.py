@@ -3,7 +3,7 @@
 Validates the two CI outcomes end-to-end against synthetic live signals that
 exactly match the real Workflow_18 scenario fixture content (Scenario 02 /
 Scenario 03 / Scenario 04 payloads reproduced verbatim from the JSON files in
-``Data sets/Workflow 9/carrier_intelligence_dataset/``).
+``Data sets/Workflow_18/test_dataset/``).
 
 TEST_DATA_ROOT is NOT required.  These tests drive the ``run_live()`` path —
 the identical entry point the G6 ``carrier_appetite_batch`` monitor uses —

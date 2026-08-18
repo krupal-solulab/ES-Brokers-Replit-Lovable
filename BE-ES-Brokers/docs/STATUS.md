@@ -85,7 +85,7 @@ untouched (confirmed via `git status`; MGA router still an empty `@router` with 
   synthetic missing-ACORD case proving the `REQUEST_INFO` path.
 
 **Dataset:** `Workflow_10` (E&S · Market Matching — added to DATA_AND_FIXTURES.md's
-mapping table), copied from the provided `Data sets/Workflow 1/market_matching_dataset/`
+mapping table), copied from the provided `Data sets/Workflow_10/test_dataset/`
 into `TEST_DATA_ROOT/Workflow_10/test_dataset/` unchanged, plus an authored
 `Validation_Rules_Test_Dataset.md` consolidating the dataset's own README + interpretation
 guide into the standard filename.
@@ -203,7 +203,7 @@ mock data (`simulateRequest`), untouched.
 - Backend: `ruff check .` / `mypy src` clean; `pytest tests/test_es_market_matching.py` 9/9 pass.
 - Frontend: `tsc --noEmit` clean; `eslint` clean (one pre-existing, unrelated `no-explicit-any`
   in a shared `Button` helper, untouched); `npm run build` succeeds.
-- Dataset alignment confirmed: `Data sets/Workflow 1/market_matching_dataset` is byte-identical
+- Dataset alignment confirmed: `Data sets/Workflow_10/test_dataset` is byte-identical
   to the `TEST_DATA_ROOT/Workflow_10/test_dataset` fixtures the backend actually reads (only an
   added doc file differs). All 6 submissions' live API output matches the dataset README's
   documented "Expected Ranking Output" exactly, including both edge cases (partial-fit ranking
@@ -279,7 +279,7 @@ migration (reuses `Decision`/`OutputPackage`/`AuditEntry` — see deviations bel
   as a **mandatory, non-skippable release-gate case** per the PRD's own risk register.
 
 **Dataset:** `Workflow_11` (E&S · Package Assembly — added to DATA_AND_FIXTURES.md's mapping
-table), copied from `Data sets/Workflow 2/package_assembly_dataset/` into
+table), copied from `Data sets/Workflow_11/test_dataset/` into
 `TEST_DATA_ROOT/Workflow_11/test_dataset/` unchanged, plus an authored
 `Validation_Rules_Test_Dataset.md`.
 
@@ -394,7 +394,7 @@ migration (reuses `Decision`/`OutputPackage`/`AuditEntry`, same as Package Assem
   junior clear forbidden → senior clear → approve succeeds).
 
 **Dataset:** `Workflow_12` (E&S · Retail Agent Communication — added to
-DATA_AND_FIXTURES.md's mapping table), copied from `Data sets/Workflow 3/retail_comm_dataset/`
+DATA_AND_FIXTURES.md's mapping table), copied from `Data sets/Workflow_12/test_dataset/`
 into `TEST_DATA_ROOT/Workflow_12/test_dataset/` unchanged.
 
 **Key decisions / deviations (pre-approved)**
@@ -581,7 +581,7 @@ downstream handoff). No migration; `core/common` and `verticals/mga/**` confirme
   the full FR-20 handoff + MULTI_OPTION-doesn't-autofire behavior end to end.
 
 **Dataset:** `Workflow_13` (E&S · Quote Comparison — added to DATA_AND_FIXTURES.md's mapping
-table), copied from `Data sets/Workflow 4/quote_comparison_dataset/` into
+table), copied from `Data sets/Workflow_13/test_dataset/` into
 `TEST_DATA_ROOT/Workflow_13/test_dataset/` unchanged.
 
 **Key decisions / deviations (pre-approved)**
@@ -708,7 +708,7 @@ scope creep): one new function in `agent_communication_hooks.py`, and a 7th trig
   flow for BOTH reconciliation stages end to end.
 
 **Dataset:** `Workflow_14` (E&S · Binder & Policy Issuance — added to DATA_AND_FIXTURES.md's
-mapping table), copied from `Data sets/Workflow 5/binder_issuance_dataset/` into
+mapping table), copied from `Data sets/Workflow_14/test_dataset/` into
 `TEST_DATA_ROOT/Workflow_14/test_dataset/` unchanged.
 
 **Key decisions / deviations (pre-approved)**
@@ -828,7 +828,7 @@ FR-19): an 8th trigger type, `ENDORSEMENT_CONFIRMED`, added to `agent_communicat
 
 **Dataset:** `Workflow_15` (E&S · Endorsement / Mid-Term Change Processing — added to
 DATA_AND_FIXTURES.md's mapping table), copied from
-`Data sets/Workflow 6/endorsement_dataset/` into `TEST_DATA_ROOT/Workflow_15/test_dataset/`
+`Data sets/Workflow_15/test_dataset/` into `TEST_DATA_ROOT/Workflow_15/test_dataset/`
 unchanged.
 
 **Key decisions / deviations (pre-approved)**
@@ -935,7 +935,7 @@ ones).
 **Dataset:** `Workflow_16` (E&S · Renewal Remarketing — added to DATA_AND_FIXTURES.md's mapping
 table, with an explicit note distinguishing this from the MGA table's separate, never-built
 "Renewal Management" row at index 2), copied from
-`Data sets/Workflow 7/renewal_remarketing_dataset/` into `TEST_DATA_ROOT/Workflow_16/test_dataset/`
+`Data sets/Workflow_16/test_dataset/` into `TEST_DATA_ROOT/Workflow_16/test_dataset/`
 unchanged. Simplest fixture shape of any E&S workflow so far — every scenario is one
 already-structured `renewal_context.json`, no raw emails, no new extraction target at all.
 
@@ -1045,7 +1045,7 @@ unmodified existing ones).
 
 **Dataset:** `Workflow_17` (E&S · Diligent Search & Compliance Documentation — added to
 DATA_AND_FIXTURES.md's mapping table), copied from
-`Data sets/Workflow 8/diligent_search_dataset/` into `TEST_DATA_ROOT/Workflow_17/test_dataset/`
+`Data sets/Workflow_17/test_dataset/` into `TEST_DATA_ROOT/Workflow_17/test_dataset/`
 unchanged. Only 4 scenarios (smaller than every prior dataset) and the simplest fixture shape of
 any E&S workflow so far, tied with Renewal Remarketing — every scenario is one already-structured
 `case_context.json`, no raw emails, no new extraction target at all.
@@ -1156,7 +1156,7 @@ unmodified existing ones).
 
 **Dataset:** `Workflow_18` (E&S · Carrier Appetite Intelligence Tracking — added to
 DATA_AND_FIXTURES.md's mapping table), copied from
-`Data sets/Workflow 9/carrier_intelligence_dataset/` into `TEST_DATA_ROOT/Workflow_18/test_dataset/`
+`Data sets/Workflow_18/test_dataset/` into `TEST_DATA_ROOT/Workflow_18/test_dataset/`
 unchanged. Only 4 scenarios, deliberately weighted 3-of-4 toward SUPPRESSED — this dataset exists
 to prove the conservative version works, not to showcase detection.
 
@@ -1270,7 +1270,7 @@ unmodified existing ones).
 
 **Dataset:** `Workflow_19` (E&S · Pipeline & Carrier Performance Reporting — added to
 DATA_AND_FIXTURES.md's mapping table, with an explicit note that this completes the original
-10-item E&S roadmap), copied from `Data sets/Workflow 10/pipeline_reporting_dataset/` into
+10-item E&S roadmap), copied from `Data sets/Workflow_19/test_dataset/` into
 `TEST_DATA_ROOT/Workflow_19/test_dataset/` unchanged.
 
 **Key decisions / deviations (pre-approved)**

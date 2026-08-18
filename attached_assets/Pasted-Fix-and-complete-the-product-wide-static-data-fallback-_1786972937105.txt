@@ -1,0 +1,79 @@
+Fix and complete the product-wide "static data" fallback in BE-ES-Brokers so it reliably 
+triggers on 3 conditions (I want this correct everywhere, not just in a few workflows):
+
+  1. Any connector is disconnected (in ANY CONNECTORS_MODE, live or mock)
+  2. OpenAI balance/quota is insufficient (in ANY CONNECTORS_MODE)
+  3. CONNECTORS_MODE = "mock"
+
+If ANY of these is true, the whole product must serve static/fixture data — never a 
+half-live/half-static response.
+
+The core resolver already exists at src/core/data_mode.py (`resolve_data_mode`), consumed by 
+src/core/ingestion/connectors.py (`build_connector_service`) and src/core/llm/service.py 
+(`build_llm_service`), and surfaced to the FE via src/core/app_config/router.py + 
+FE-ES-Brokers/src/lib/api/dataMode.ts + AppShell.tsx's StaticDataBanner. Do NOT rebuild this — 
+extend it. Specifically:
+
+1. FIX (P0, blocking on Replit): TEST_DATA_ROOT in .env.example currently points to an 
+   external local path (D:\INDUSTRY AI OS bac\test data) that will not exist in the Replit 
+   environment, meaning static/mock data can fail to load even when the resolver correctly 
+   decides mode="static". Point fixture loading at the in-repo "BE-ES-Brokers/Data sets" 
+   folder instead (bundle it as a relative path, e.g. os.path.join(repo_root, "Data sets"), 
+   with no dependency on any machine-specific absolute path). Reconcile the folder-naming 
+   mismatch between what's in "Data sets" (spaces: "Workflow 1", subfolders like 
+   "market_matching_dataset/submission_01") and what src/fixtures/loader.py plus each 
+   workflow's scenario_loader.py (under src/verticals/es/workflows/<name>/scenario_loader.py) 
+   actually expect on disk. Normalize whichever side is easier without breaking existing 
+   fixture-reading code, and update docs/DATA_AND_FIXTURES.md to match. Verify every 
+   workflow (1 through however many exist, including 11+ which use their own 
+   scenario_loader.py) can load its fixtures purely from inside the repo.
+
+2. Widen the connector check in resolve_data_mode() (src/core/data_mode.py): today it only 
+   checks the "google-mail" connection (settings.nango_integration_mail). Change it to check 
+   ALL registered connectors relevant to the ingest/writeback paths in use — 
+   nango_integration_mail, nango_integration_sheet, nango_integration_drive, 
+   nango_integration_slack (see src/core/config.py) — via 
+   core/integrations/repository.get_connection(). If ANY of them is missing/not 
+   status=="connected", return DataMode("static", "connector_disconnected"), same as today's 
+   single-connector logic. Keep the existing 15s per-tenant cache 
+   (_conn_check_cache/invalidate_connection_cache) but extend it to hold the combined result 
+   for the full connector set. If some connectors are genuinely optional per workflow (e.g. 
+   Slack only matters for notification workflows), tell me which ones you found are 
+   conditionally required vs always-required before hardcoding "all 4 always required" — 
+   default to "all 4 required" if unsure.
+
+3. OpenAI balance check (src/core/llm/service.py + src/core/data_mode.py): today 
+   note_llm_quota_error()/llm_quota_active() only fire reactively, after a live OpenAI call 
+   fails with an insufficient_quota-style error, and only cache "insufficient" for 5 minutes. 
+   Keep this reactive path (it's a reasonable safety net), but also broaden 
+   _is_quota_error() to catch the full set of OpenAI billing failure signals (HTTP 402, 
+   `insufficient_quota`, `billing_hard_limit_reached`, `exceeded your current quota`) so 
+   nothing billing-related slips through as a generic error. If OpenAI's API key in use has 
+   org-level billing scope, add a lightweight proactive balance check too (e.g. hitting 
+   OpenAI's usage/billing endpoint on an interval, not per-request) that calls 
+   note_llm_quota_error() preemptively — but only if this doesn't add per-request latency; 
+   otherwise stick with the reactive mechanism and tell me that's the tradeoff you made.
+
+4. Product-wide audit: walk every workflow router under 
+   src/verticals/{mga,es}/workflows/*/router.py and every service file underneath, and 
+   confirm each one obtains its connector and LLM instances ONLY via build_connector_service() 
+   and build_llm_service() — never a raw Nango client or raw OpenAI client instantiated 
+   directly. Fix any workflow you find bypassing this, since that would mean static mode 
+   doesn't actually apply to it. List every workflow you touched.
+
+5. After the above, do NOT change write/writeback behavior (send_email, append_rows, put_file, 
+   upload_file, create_event, send_slack_message in StaticFallbackConnectorService) — those 
+   must keep failing loudly instead of silently faking a send, that's intentional existing 
+   behavior.
+
+6. Test end-to-end in the Replit preview for at least 2 workflows:
+   a. Set CONNECTORS_MODE=mock — confirm static data renders + StaticDataBanner shows in FE.
+   b. Set CONNECTORS_MODE=live with one non-Gmail connector (e.g. Slack) disconnected — 
+      confirm it now correctly falls back to static (this currently does NOT work — that's 
+      the main bug you're fixing in step 2).
+   c. Trigger note_llm_quota_error() (or a real insufficient_quota response) — confirm the 
+      whole product goes static for the 5-minute TTL, then reverts to live.
+
+Report back exactly which files you changed, and flag anything where you had to make a 
+judgment call instead of a clear fix (especially the "which connectors are truly required 
+per workflow" question in step 2).

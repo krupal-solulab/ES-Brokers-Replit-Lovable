@@ -44,9 +44,32 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+// In production there is no Vite dev-server proxy, so the SSR server itself
+// forwards /api requests to the local FastAPI backend (same behavior as the
+// dev proxy in vite.config.ts).
+const API_BACKEND_ORIGIN = process.env.API_BACKEND_ORIGIN ?? "http://127.0.0.1:4000";
+
+async function proxyApiRequest(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const target = `${API_BACKEND_ORIGIN}${url.pathname}${url.search}`;
+  const headers = new Headers(request.headers);
+  headers.delete("host");
+  return fetch(target, {
+    method: request.method,
+    headers,
+    body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
+    // @ts-expect-error -- undici requires duplex for streaming bodies
+    duplex: "half",
+    redirect: "manual",
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      if (new URL(request.url).pathname.startsWith("/api/")) {
+        return await proxyApiRequest(request);
+      }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

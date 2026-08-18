@@ -1,6 +1,6 @@
 """E&S Carrier Appetite Intelligence Tracking eval test — proves the
 pipeline + router against the REAL Workflow_18 dataset (originally
-``Data sets/Workflow 9/carrier_intelligence_dataset``, copied to
+``Data sets/Workflow_18/test_dataset``, copied to
 ``TEST_DATA_ROOT/Workflow_18/test_dataset`` per DATA_AND_FIXTURES.md).
 
 Pytest-discovered here (not under src/verticals/es/...) — see
@@ -15,6 +15,8 @@ produce a suggestion regardless of consistency direction.
 from __future__ import annotations
 
 import pytest
+
+from fixtures.loader import dataset_dir as _bundled_dataset_dir
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 
@@ -37,8 +39,8 @@ from verticals.es.workflows.carrier_appetite_intelligence.service import (
 )
 
 pytestmark = pytest.mark.skipif(
-    not get_settings().test_data_root,
-    reason="TEST_DATA_ROOT not set; real Workflow_18 fixtures unavailable",
+    _bundled_dataset_dir(18) is None,
+    reason="Workflow_18 fixture dataset not found (TEST_DATA_ROOT or bundled Data sets)",
 )
 
 
