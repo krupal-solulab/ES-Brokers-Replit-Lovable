@@ -743,6 +743,16 @@ def build_connector_service(
     fixture-mode call site keeps working unchanged. ``tenant_id`` is optional too —
     passing it lets an admin's ``connectors_mode`` override (AP-04) take effect;
     omitting it just falls back to the env default, exactly as before.
+
+    Deliberately does NOT fall back to mock data when a tenant's Nango connection
+    is missing: every live-only call site either (a) reads/writes one SPECIFIC real
+    item a human explicitly picked (an actual Gmail message id, an actual Sheets/
+    Drive/Calendar write) — substituting fixture content there would silently
+    fabricate real business data under a real record — or (b) is a best-effort
+    write-back that already catches ``ConnectorNotConnectedError`` itself and
+    degrades gracefully (see ``core/ingestion/calendar_writeback.py`` /
+    ``drive_writeback.py``). Raising here and letting each call site decide is
+    the safe behavior; see ``docs/CONNECTORS_NANGO.md``.
     """
     settings = settings or get_settings()
     mode = settings.connectors_mode

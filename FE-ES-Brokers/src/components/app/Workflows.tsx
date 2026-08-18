@@ -625,11 +625,10 @@ export function SubmissionMarketMatching() {
     queryKey: ["market-matching", "list"],
     queryFn: listMarketMatching,
   });
-  // Live is the only ingestion path now — hides any earlier submission_01..06
-  // fixture runs still sitting in the database rather than deleting them.
-  const items = (listQuery.data ?? []).filter(
-    (i) => !/^submission_\d+$/.test(i.submission_id ?? ""),
-  );
+  // Shows fixture submission_01..06 runs alongside live ones — hardcoded
+  // backend data is intentionally visible for now (temporary, until every
+  // tenant is fully on live connectors; see docs/DATA_AND_FIXTURES.md).
+  const items = listQuery.data ?? [];
   // No silent fallback: everything below is scoped to the ONE explicitly
   // selected submission — nothing selected shows the empty state instead of
   // another submission's data.
@@ -1863,12 +1862,10 @@ export function PackageAssembly({ search = {} }: { search?: Record<string, unkno
     queryKey: ["package-assembly", "list"],
     queryFn: listPackageAssembly,
   });
-  // Live is the only ingestion path now — hides Workflow_10/Workflow_11
-  // fixture-sourced packages still sitting in the database rather than
-  // deleting them (same pattern as Market Matching's live-only cutover).
-  const items = (listQuery.data ?? []).filter(
-    (i) => !/^(submission_\d+|SUB-\d+)/i.test(i.submission_id ?? ""),
-  );
+  // Shows Workflow_10/Workflow_11 fixture-sourced packages alongside live
+  // ones — hardcoded backend data is intentionally visible for now
+  // (temporary, until every tenant is fully on live connectors).
+  const items = listQuery.data ?? [];
 
   const detailQuery = useQuery({
     queryKey: ["package-assembly", "detail", selectedId],
@@ -2141,13 +2138,10 @@ export function RetailAgentCopilot({ search = {} }: { search?: Record<string, un
     queryKey: ["agent-communication", "list"],
     queryFn: listAgentCommunication,
   });
-  // Live is the only ingestion path now — hides fixture/test-data threads
-  // still sitting in the database rather than deleting them (same pattern
-  // as Workflows 1/2). Real Gmail-sourced submission ids are always a
-  // 16-character hex string; fixture ids use far more varied shapes here
-  // (SUB-/BIND-/TEST-VERIFY-/scenario_/submission_...), so an allowlist on
-  // the real id shape is more robust than blocklisting every fixture prefix.
-  const items = (listQuery.data ?? []).filter((i) => /^[0-9a-f]{16}$/i.test(i.submission_id ?? ""));
+  // Shows fixture/test-data threads alongside real Gmail-sourced ones —
+  // hardcoded backend data is intentionally visible for now (temporary,
+  // until every tenant is fully on live connectors).
+  const items = listQuery.data ?? [];
 
   useEffect(() => {
     if (!selectedId && listQuery.data && listQuery.data.length > 0) {
@@ -2936,11 +2930,10 @@ export function QuoteComparison({ search = {} }: { search?: Record<string, unkno
     queryKey: ["quote-comparison", "list"],
     queryFn: listQuoteComparison,
   });
-  // Live is the only ingestion path shown here now — hides Workflow_13
-  // fixture-scenario comparisons still sitting in the database rather than
-  // deleting them (same pattern as the other converted workflows). Real
-  // submission ids are the 16-char lowercase hex Gmail message id shape.
-  const items = (listQuery.data ?? []).filter((i) => /^[0-9a-f]{16}$/i.test(i.submission_id ?? ""));
+  // Shows Workflow_13 fixture-scenario comparisons alongside live ones —
+  // hardcoded backend data is intentionally visible for now (temporary,
+  // until every tenant is fully on live connectors).
+  const items = listQuery.data ?? [];
 
   useEffect(() => {
     if (!selectedId && items.length > 0) {
@@ -3614,13 +3607,12 @@ export function BinderIssuance() {
     queryKey: ["binder-issuance", "list"],
     queryFn: listBinderIssuance,
   });
-  // Live is the only ingestion path shown here now — a bind item is only
-  // ever created via the "Start binder" handoff from Quote Comparison, so
-  // there's no standalone "new binder" concept once live (same disable-
-  // not-delete treatment as every other converted workflow). Hides
-  // Workflow_14 fixture-scenario binders still sitting in the database
-  // rather than deleting them.
-  const items = (listQuery.data ?? []).filter((i) => /^[0-9a-f]{16}$/i.test(i.submission_id ?? ""));
+  // Shows Workflow_14 fixture-scenario binders alongside live ones (a live
+  // bind item is normally only ever created via the "Start binder" handoff
+  // from Quote Comparison) — hardcoded backend data is intentionally
+  // visible for now (temporary, until every tenant is fully on live
+  // connectors).
+  const items = listQuery.data ?? [];
 
   useEffect(() => {
     if (!selectedId && items.length > 0) {
@@ -4428,17 +4420,12 @@ export function EndorsementProcessing({ search = {} }: { search?: Record<string,
   }
 
   const listQuery = useQuery({ queryKey: ["endorsement", "list"], queryFn: listEndorsement });
-  // Live is the only ingestion path shown here now — a request is only ever
-  // created via the "Start endorsement request" handoff from Binder &
-  // Issuance, so there's no standalone "new request" concept once live
-  // (same disable-not-delete treatment as every converted workflow). Real
-  // endorsement items' bind_id/submission_id is Binder & Issuance's own
-  // real (UUID-shaped) item id — fixture bind ids look like "BIND-6601",
-  // never UUID-shaped, so a UUID regex (not the 16-hex one used elsewhere)
-  // is the real-vs-fixture discriminator for this workflow specifically.
-  const items = (listQuery.data ?? []).filter((i) =>
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(i.submission_id ?? ""),
-  );
+  // Shows fixture endorsements (bind ids like "BIND-6601") alongside live
+  // ones (a live request is normally only ever created via the "Start
+  // endorsement request" handoff from Binder & Issuance) — hardcoded
+  // backend data is intentionally visible for now (temporary, until every
+  // tenant is fully on live connectors).
+  const items = listQuery.data ?? [];
 
   useEffect(() => {
     if (!selectedId && items.length > 0) {
@@ -4918,16 +4905,12 @@ export function RenewalRemarketing() {
     queryKey: ["renewal-remarketing", "list"],
     queryFn: listRenewalRemarketing,
   });
-  // Live is the only ingestion path shown here now — a review is only ever
-  // created via "Check live renewal" (or the live comparison-stage
-  // handoff), so there's no standalone "new review" concept once live
-  // (same disable-not-delete treatment as every converted workflow). Real
-  // bind_ids are UUIDs (Binder & Issuance's own review item id, now stable
-  // — see this session's bind_id fix); fixture bind ids look like
-  // "BIND-6604", never UUID-shaped.
-  const items = (listQuery.data ?? []).filter((i) =>
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(i.submission_id ?? ""),
-  );
+  // Shows fixture renewals (bind ids like "BIND-6604") alongside live ones
+  // (a live review is normally only ever created via "Check live renewal"
+  // or the live comparison-stage handoff) — hardcoded backend data is
+  // intentionally visible for now (temporary, until every tenant is fully
+  // on live connectors).
+  const items = listQuery.data ?? [];
 
   useEffect(() => {
     if (!selectedId && items.length > 0) {
@@ -6362,11 +6345,11 @@ export function CarrierAppetiteIntelligence() {
     queryKey: ["carrier-appetite-intelligence", "list"],
     queryFn: listCarrierAppetiteIntelligence,
   });
-  // Real live evaluations always carry class_code "ALL" (Quote Comparison's
-  // real payload has no class_code field at all — live_signal_builder.py
-  // aggregates per-carrier across all classes); fixture-scenario items
-  // always carry a real class name instead, never "ALL".
-  const items = (listQuery.data ?? []).filter((i) => i.payload?.class_code === "ALL");
+  // Shows fixture-scenario items (real class name, e.g. "habitational")
+  // alongside live evaluations (class_code "ALL") — hardcoded backend data
+  // is intentionally visible for now (temporary, until every tenant is
+  // fully on live connectors).
+  const items = listQuery.data ?? [];
   const suppressedCount = items.filter((i) => i.payload?.status === "SUPPRESSED").length;
 
   const detailQuery = useQuery({
@@ -6805,10 +6788,11 @@ export function PipelineCarrierReporting() {
     queryKey: ["pipeline-reporting", "list"],
     queryFn: listPipelineReporting,
   });
-  // Real live reports always set period to this exact literal
-  // (service.py's run_live); fixture scenarios use a period like "Q3 2027",
-  // never this string.
-  const items = (listQuery.data ?? []).filter((i) => i.payload?.period === "Live (current data)");
+  // Shows fixture scenarios (period like "Q3 2027") alongside live reports
+  // (period "Live (current data)") — hardcoded backend data is
+  // intentionally visible for now (temporary, until every tenant is fully
+  // on live connectors).
+  const items = listQuery.data ?? [];
   const gapCount = items.filter((i) => i.payload?.data_completeness.status === "PARTIAL").length;
 
   const detailQuery = useQuery({

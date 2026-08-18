@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Protocol
+
+log = logging.getLogger(__name__)
 
 from core.common.dtos import Citation, Ctx, Draft, ExtractedValue
 from core.config import Settings, get_settings
@@ -64,15 +67,21 @@ class OpenAIProvider:
 
     async def complete(self, *, model: str, system: str, user: str) -> str:
         client = self._get_client()
-        resp = await client.chat.completions.create(  # type: ignore[attr-defined]
-            model=model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=0,
-        )
-        return resp.choices[0].message.content or ""
+        try:
+            resp = await client.chat.completions.create(  # type: ignore[attr-defined]
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=0,
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as exc:  # noqa: BLE001 — any OpenAI failure (quota, auth, rate
+            # limit, network, ...) falls back to the offline mock rather than 500ing
+            # a workflow run.
+            log.warning("OpenAI completion failed (%s); falling back to MockLLMProvider.", exc)
+            return await MockLLMProvider().complete(model=model, system=system, user=user)
 
 
 class LLMService:
