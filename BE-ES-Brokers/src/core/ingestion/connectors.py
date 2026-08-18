@@ -806,15 +806,13 @@ def build_connector_service(
     passing it lets an admin's ``connectors_mode`` override (AP-04) take effect;
     omitting it just falls back to the env default, exactly as before.
 
-    Deliberately does NOT fall back to mock data when a tenant's Nango connection
-    is missing: every live-only call site either (a) reads/writes one SPECIFIC real
-    item a human explicitly picked (an actual Gmail message id, an actual Sheets/
-    Drive/Calendar write) — substituting fixture content there would silently
-    fabricate real business data under a real record — or (b) is a best-effort
-    write-back that already catches ``ConnectorNotConnectedError`` itself and
-    degrades gracefully (see ``core/ingestion/calendar_writeback.py`` /
-    ``drive_writeback.py``). Raising here and letting each call site decide is
-    the safe behavior; see ``docs/CONNECTORS_NANGO.md``.
+    A disconnected connector falls back to fixture data (``StaticFallbackConnectorService``)
+    for read paths only — write-back methods (send/append/upload/create) are excluded from
+    that fallback and still raise ``ConnectorNotConnectedError``, since silently recording a
+    send/upload that never happened would misrepresent a real action as having occurred.
+    Call sites that genuinely require the live connector (e.g. attaching one specific real
+    Gmail message a human picked) use ``unwrap_live_connector`` instead of relying on this
+    factory's return type; see ``docs/CONNECTORS_NANGO.md``.
     """
     from core.data_mode import get_current_data_mode, llm_quota_active  # avoids cycle
 
